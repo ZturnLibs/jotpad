@@ -3,6 +3,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { debounce } from "@/lib/utils";
+import { platform } from "@/lib/utils";
 import { getMenuModel, runMenuAction, type MenuItemModel } from "@/lib/menuActions";
 
 interface MenuDef {
@@ -48,11 +49,32 @@ function toDefs(items: MenuItemModel[]): MenuDef[] {
 /** Rebuild the native menu from the current app state. */
 export async function applyNativeMenu(): Promise<void> {
   const model = getMenuModel();
-  const menus: MenuDef[] = [
-    { type: "submenu", text: model.fileLabel, items: toDefs(model.file) },
-    { type: "submenu", text: model.editLabel, items: toDefs(model.edit) },
-    { type: "submenu", text: model.viewLabel, items: toDefs(model.view) },
-  ];
+  const isMac = platform() === "macos";
+  const menus: MenuDef[] = [];
+
+  if (isMac) {
+    // macOS: first submenu becomes the bold app menu. Provide our own named
+    // "Jotpad" (capital J) so the OS doesn't synthesize one from the lowercase
+    // process/executable name.
+    const about = model.file.find((i) => i.id === "about");
+    const exit = model.file.find((i) => i.id === "exit");
+    const appItems: MenuItemModel[] = [];
+    if (about) appItems.push(about);
+    appItems.push({ sep: true });
+    if (exit) appItems.push(exit);
+    menus.push({ type: "submenu", text: "Jotpad", items: toDefs(appItems) });
+
+    // File menu without About/Exit (now in the app menu); trim trailing separator.
+    let fileItems = model.file.filter((i) => i.id !== "about" && i.id !== "exit");
+    while (fileItems.length && fileItems[fileItems.length - 1].sep) fileItems.pop();
+    menus.push({ type: "submenu", text: model.fileLabel, items: toDefs(fileItems) });
+  } else {
+    menus.push({ type: "submenu", text: model.fileLabel, items: toDefs(model.file) });
+  }
+
+  menus.push({ type: "submenu", text: model.editLabel, items: toDefs(model.edit) });
+  menus.push({ type: "submenu", text: model.viewLabel, items: toDefs(model.view) });
+
   try {
     await invoke("set_app_menu", { menus });
   } catch (e) {

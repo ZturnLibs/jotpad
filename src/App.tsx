@@ -6,15 +6,16 @@ import { basename, getSystemAccent } from "@/lib/backend";
 import { clamp, darken, lighten, platform, rgbToHex } from "@/lib/utils";
 import { getEditorView } from "@/lib/editorRef";
 import { insertAtCursor, timeDateString } from "@/lib/edit";
+import { runMenuAction } from "@/lib/menuActions";
 import { applyNativeMenuDebounced, startNativeMenuListener } from "@/lib/platformMenu";
 import { TabBar } from "@/components/TabBar";
-import { MenuBar } from "@/components/MenuBar";
 import { Toolbar } from "@/components/Toolbar";
 import { Editor } from "@/components/Editor";
 import { FindBar } from "@/components/FindBar";
 import { StatusBar } from "@/components/StatusBar";
 import { Settings } from "@/components/Settings";
 import { ContextMenu } from "@/components/ContextMenu";
+import { PageSetup } from "@/components/PageSetup";
 import { About, ConfirmDialog, GotoDialog } from "@/components/Dialogs";
 
 function applyTheme(mode: "light" | "dark" | "system") {
@@ -37,8 +38,6 @@ export function App() {
   const tabsLen = useStore((s) => s.tabs.length);
   const activeTab = useStore((s) => s.tabs.find((t) => t.id === s.activeTabId));
   const t = useT();
-  // macOS + Linux use the native menu bar; Windows keeps the custom in-window menu.
-  const useNativeMenu = platform() === "macos" || platform() === "linux";
 
   // Boot: load persisted state.
   useEffect(() => {
@@ -50,12 +49,12 @@ export function App() {
     document.documentElement.dataset.platform = platform();
   }, []);
 
-  // macOS / Linux: drive the native menu bar.
+  // Native system menu bar on every platform (macOS top bar / Win·Linux window menu).
   useEffect(() => {
-    if (!useNativeMenu || !ready) return;
+    if (!ready) return;
     void startNativeMenuListener();
     applyNativeMenuDebounced();
-  }, [useNativeMenu, ready, settings, activeTabId, tabsLen]);
+  }, [ready, settings, activeTabId, tabsLen]);
 
   // Apply theme; react to system changes when in "system" mode.
   useEffect(() => {
@@ -134,6 +133,11 @@ export function App() {
       if (mod && k === "n" && !e.shiftKey) {
         eat();
         s.newTab();
+        return;
+      }
+      if (mod && e.shiftKey && k === "n") {
+        eat();
+        runMenuAction("newWindow");
         return;
       }
       if (mod && k === "o") {
@@ -275,7 +279,6 @@ export function App() {
   return (
     <div className="app">
       <TabBar />
-      {!useNativeMenu && <MenuBar />}
       <Toolbar />
       <div className="editor-wrap-host" style={{ flex: 1, position: "relative", minHeight: 0 }}>
         <Editor />
@@ -285,6 +288,7 @@ export function App() {
       <ContextMenu />
       <ConfirmDialog />
       <GotoDialog />
+      <PageSetup />
       <Settings />
       <About />
     </div>

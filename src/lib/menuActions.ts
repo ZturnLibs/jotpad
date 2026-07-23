@@ -16,6 +16,7 @@ import {
   timeDateString,
 } from "@/lib/edit";
 import { clamp, MOD, platform } from "@/lib/utils";
+import { loadPrintSetup, pageSizeCss } from "@/lib/print";
 import {
   ENCODINGS,
   LINE_ENDINGS,
@@ -50,12 +51,35 @@ export interface MenuModel {
 const isMac = platform() === "macos";
 
 /** accelerator helper */
-const A = (k: string) => `CommandOrControl+${k}`;
+const A = (k: string) => `CmdOrCtrl+${k}`;
+
+/** Open a new independent application window. */
+async function createNewWindow(): Promise<void> {
+  try {
+    const { WebviewWindow } = await import("@tauri-apps/api/webviewWindow");
+    const label = `win-${Date.now()}`;
+    const win = new WebviewWindow(label, {
+      title: "Jotpad",
+      width: 980,
+      height: 660,
+      minWidth: 600,
+      minHeight: 400,
+      center: true,
+      titleBarStyle: "overlay",
+      hiddenTitle: true,
+    });
+    win.once("tauri://error", (e) => console.error("new window error", e));
+  } catch (e) {
+    console.error("createNewWindow failed", e);
+  }
+}
 
 function printDoc(): void {
   const view = getEditorView();
   if (!view) return;
   const text = view.state.doc.toString();
+  const ps = loadPrintSetup();
+  const sizeCss = pageSizeCss(ps);
   const iframe = document.createElement("iframe");
   iframe.style.position = "fixed";
   iframe.style.right = "0";
@@ -69,7 +93,7 @@ function printDoc(): void {
   const doc = cw.document;
   doc.open();
   doc.write(
-    `<html><head><title>${document.title}</title><style>body{margin:24px}pre{white-space:pre-wrap;word-wrap:break-word;font:14px/1.6 Consolas,Menlo,monospace}</style></head><body></body></html>`,
+    `<html><head><title>${document.title}</title><style>@page{size:${sizeCss};margin:${ps.margin}mm}html,body{margin:0;padding:0}pre{white-space:pre-wrap;word-wrap:break-word;font:14px/1.6 Consolas,Menlo,monospace;padding:0}</style></head><body></body></html>`,
   );
   doc.close();
   const pre = doc.createElement("pre");
@@ -91,7 +115,12 @@ export function getMenuModel(): MenuModel {
 
   const file: MenuItemModel[] = [
     { id: "new", label: t("file.new"), shortcut: `${MOD}+N`, accel: A("N") },
-    { id: "closeTab", label: t("tab.close"), shortcut: `${MOD}+W`, accel: A("W") },
+    {
+      id: "newWindow",
+      label: t("file.newWindow"),
+      shortcut: `${MOD}+Shift+N`,
+      accel: A("Shift+N"),
+    },
     { id: "open", label: t("file.open"), shortcut: `${MOD}+O`, accel: A("O") },
     { sep: true },
     { id: "save", label: t("file.save"), shortcut: `${MOD}+S`, accel: A("S") },
@@ -102,6 +131,7 @@ export function getMenuModel(): MenuModel {
       accel: A("Shift+S"),
     },
     { sep: true },
+    { id: "pageSetup", label: t("file.pageSetup") },
     { id: "print", label: t("file.print"), shortcut: `${MOD}+P`, accel: A("P") },
     { sep: true },
     { id: "about", label: t("misc.about") },
@@ -219,6 +249,9 @@ export function runMenuAction(id: string): void {
     case "new":
       s.newTab();
       break;
+    case "newWindow":
+      void createNewWindow();
+      break;
     case "closeTab":
       if (s.activeTabId) s.requestClose(s.activeTabId);
       break;
@@ -233,6 +266,9 @@ export function runMenuAction(id: string): void {
       break;
     case "print":
       printDoc();
+      break;
+    case "pageSetup":
+      s.setPageSetupOpen(true);
       break;
     case "about":
       s.setAboutOpen(true);

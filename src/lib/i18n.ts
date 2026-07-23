@@ -25,6 +25,15 @@ const zhCN: Dict = {
   "file.print": "打印…",
   "file.exit": "退出",
 
+  // Page setup
+  "pageSetup.title": "页面设置",
+  "pageSetup.paper": "纸张大小",
+  "pageSetup.orientation": "方向",
+  "pageSetup.portrait": "纵向",
+  "pageSetup.landscape": "横向",
+  "pageSetup.margin": "页边距（毫米）",
+  "pageSetup.ok": "确定",
+
   // Edit menu
   "edit.undo": "撤销",
   "edit.redo": "重做",
@@ -149,6 +158,15 @@ const en: Dict = {
   "file.pageSetup": "Page Setup…",
   "file.print": "Print…",
   "file.exit": "Exit",
+
+  // Page setup
+  "pageSetup.title": "Page Setup",
+  "pageSetup.paper": "Paper size",
+  "pageSetup.orientation": "Orientation",
+  "pageSetup.portrait": "Portrait",
+  "pageSetup.landscape": "Landscape",
+  "pageSetup.margin": "Margins (mm)",
+  "pageSetup.ok": "OK",
 
   "edit.undo": "Undo",
   "edit.redo": "Redo",

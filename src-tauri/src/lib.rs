@@ -190,7 +190,11 @@ fn set_app_menu(
     window: tauri::WebviewWindow,
     menus: Vec<menu::MenuNode>,
 ) -> Result<(), String> {
-    menu::apply(&app, &window, menus).map_err(|e| e.to_string())
+    eprintln!("[menu] set_app_menu invoked: {} top menus", menus.len());
+    menu::apply(&app, &window, menus).map_err(|e| {
+        eprintln!("[menu] apply ERROR: {e}");
+        e.to_string()
+    })
 }
 
 /// Best-effort system accent color as [r, g, b].
@@ -238,6 +242,17 @@ pub fn run() {
             get_system_accent
         ])
         .on_menu_event(|app, event| menu::handle_event(app, event))
+        .setup(|app| {
+            // Establish the menu at launch so the macOS menu bar is populated
+            // immediately (runtime set_menu on macOS does not reliably refresh
+            // an already-shown main menu).
+            if let Some(window) = app.get_webview_window("main") {
+                let menu = menu::default_menu(app)?;
+                window.set_menu(menu)?;
+                eprintln!("[menu] startup menu set on main window");
+            }
+            Ok(())
+        })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

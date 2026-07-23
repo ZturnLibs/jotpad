@@ -37,6 +37,7 @@ interface Store {
   gotoOpen: boolean;
   settingsOpen: boolean;
   aboutOpen: boolean;
+  pageSetupOpen: boolean;
   menuOpen: MenuKind;
   confirm: ConfirmState | null;
 
@@ -75,6 +76,7 @@ interface Store {
   setGotoOpen: (v: boolean) => void;
   setSettingsOpen: (v: boolean) => void;
   setAboutOpen: (v: boolean) => void;
+  setPageSetupOpen: (v: boolean) => void;
   setMenuOpen: (m: MenuKind) => void;
 
   // Exit
@@ -114,6 +116,7 @@ export const useStore = create<Store>((set, get) => ({
   gotoOpen: false,
   settingsOpen: false,
   aboutOpen: false,
+  pageSetupOpen: false,
   menuOpen: null,
   confirm: null,
 
@@ -341,6 +344,7 @@ export const useStore = create<Store>((set, get) => ({
   setGotoOpen: (v) => set({ gotoOpen: v }),
   setSettingsOpen: (v) => set({ settingsOpen: v }),
   setAboutOpen: (v) => set({ aboutOpen: v }),
+  setPageSetupOpen: (v) => set({ pageSetupOpen: v }),
   setMenuOpen: (m) => set({ menuOpen: m }),
 
   requestExit: async () => {
