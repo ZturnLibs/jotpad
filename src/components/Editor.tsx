@@ -1,0 +1,136 @@
+import { useEffect, useRef, type CSSProperties } from "react";
+import { Compartment, EditorState } from "@codemirror/state";
+import {
+  drawSelection,
+  EditorView,
+  highlightActiveLine,
+  keymap,
+} from "@codemirror/view";
+import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
+import { findNext, findPrevious, search } from "@codemirror/search";
+import { useStore } from "@/store/useStore";
+import { emitEditorInfo, setEditorView, viewInfo } from "@/lib/editorRef";
+
+export function Editor() {
+  const hostRef = useRef<HTMLDivElement>(null);
+  const viewRef = useRef<EditorView | null>(null);
+  const wrapCompartment = useRef(new Compartment());
+  const loadingRef = useRef(false);          // suppress setContent while loading a tab
+  const prevTabIdRef = useRef<string | null>(null); // outgoing tab id, for saving cursor
+
+  const activeTabId = useStore((s) => s.activeTabId);
+  const tab = useStore((s) => s.tabs.find((t) => t.id === s.activeTabId));
+  const settings = useStore((s) => s.settings);
+
+  // Create the CodeMirror instance once.
+  useEffect(() => {
+    if (!hostRef.current) return;
+    const store = useStore.getState();
+    const initial = store.activeTab()?.content ?? "";
+
+    const view = new EditorView({
+      parent: hostRef.current,
+      state: EditorState.create({
+        doc: initial,
+        extensions: [
+          history(),
+          drawSelection(),
+          EditorState.allowMultipleSelections.of(true),
+          wrapCompartment.current.of(
+            store.settings.wordWrap ? EditorView.lineWrapping : [],
+          ),
+          keymap.of([
+            ...defaultKeymap,
+            ...historyKeymap,
+            { key: "F3", run: findNext, shift: findPrevious },
+          ]),
+          highlightActiveLine(),
+          search(),
+          EditorView.contentAttributes.of({ spellcheck: "false" }),
+          EditorView.updateListener.of((u) => {
+            if (u.docChanged && !loadingRef.current) {
+              const id = useStore.getState().activeTabId;
+              if (id) useStore.getState().setContent(id, u.state.doc.toString());
+            }
+            if (u.docChanged || u.selectionSet || u.viewportChanged) {
+              emitEditorInfo(viewInfo(u.view));
+            }
+          }),
+        ],
+      }),
+    });
+    viewRef.current = view;
+    setEditorView(view);
+    return () => {
+      view.destroy();
+      setEditorView(null);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Sync document when the active tab changes.
+  useEffect(() => {
+    const view = viewRef.current;
+    if (!view) return;
+
+    // Save the outgoing tab's cursor / scroll position.
+    const prevId = prevTabIdRef.current;
+    if (prevId && prevId !== activeTabId) {
+      const sel = view.state.selection.main;
+      useStore.getState().updateTab(prevId, {
+        selection: { from: sel.from, to: sel.to },
+        scrollTop: view.scrollDOM.scrollTop,
+      });
+    }
+    prevTabIdRef.current = activeTabId;
+
+    if (!tab) return;
+
+    loadingRef.current = true;
+    const current = view.state.doc.toString();
+    if (tab.content !== current) {
+      view.dispatch({
+        changes: { from: 0, to: current.length, insert: tab.content },
+      });
+    }
+    const sel = tab.selection;
+    view.dispatch({
+      selection: sel ? { anchor: sel.from, head: sel.to } : { anchor: 0 },
+      scrollIntoView: false,
+    });
+    loadingRef.current = false;
+
+    if (tab.scrollTop) {
+      const top = tab.scrollTop;
+      requestAnimationFrame(() => {
+        view.scrollDOM.scrollTop = top;
+      });
+    }
+    emitEditorInfo(viewInfo(view));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTabId]);
+
+  // Reconfigure word wrap.
+  useEffect(() => {
+    viewRef.current?.dispatch({
+      effects: wrapCompartment.current.reconfigure(
+        settings.wordWrap ? EditorView.lineWrapping : [],
+      ),
+    });
+  }, [settings.wordWrap]);
+
+  const fontSize = settings.fontSize * (settings.zoom / 100);
+  const deco: string[] = [];
+  if (settings.underline) deco.push("underline");
+  if (settings.strikethrough) deco.push("line-through");
+
+  const styleVars = {
+    "--ef-size": `${fontSize}px`,
+    "--ef-family": settings.fontFamily,
+    "--ef-weight": settings.bold ? 700 : 400,
+    "--ef-style": settings.italic ? "italic" : "normal",
+    "--ef-deco": deco.length ? deco.join(" ") : "none",
+  } as CSSProperties;
+
+  return <div className="editor-wrap" ref={hostRef} style={styleVars} />;
+}

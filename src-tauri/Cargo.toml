@@ -1,0 +1,21 @@
+[package]
+name = "jotpad"
+version = "0.1.0"
+description = "Jotpad — A cross-platform notepad inspired by Windows 11 Notepad"
+authors = ["Jotpad"]
+edition = "2021"
+
+[lib]
+name = "jotpad_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-opener = "2"
+tauri-plugin-dialog = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+encoding_rs = "0.8"
