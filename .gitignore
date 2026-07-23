@@ -12,6 +12,10 @@ dist
 dist-ssr
 *.local
 
+# Generated icon artifacts (regenerate via `pnpm icon`)
+app-icon.png
+icon.iconset
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

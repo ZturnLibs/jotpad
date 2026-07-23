@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2AA8FF"/>
+      <stop offset="1" stop-color="#0058B0"/>
+    </linearGradient>
+  </defs>
+  <!-- macOS: content inset ~10% (824x824 centered) to match system icon sizing -->
+  <g transform="translate(100 100) scale(0.8047)">
+    <rect width="1024" height="1024" rx="228" fill="url(#bg)"/>
+    <path d="M330 214 H632 L716 298 V802 H330 Z" fill="#FFFFFF"/>
+    <path d="M632 214 V298 H716 Z" fill="#CFE6FB"/>
+    <rect x="382" y="360" width="280" height="46" rx="23" fill="#0A84FF"/>
+    <rect x="382" y="450" width="282" height="32" rx="16" fill="#C7D6E6"/>
+    <rect x="382" y="510" width="282" height="32" rx="16" fill="#C7D6E6"/>
+    <rect x="382" y="570" width="210" height="32" rx="16" fill="#C7D6E6"/>
+  </g>
+</svg>
