@@ -80,6 +80,14 @@ textarea {
   -webkit-app-region: drag;
 }
 
+/* macOS: unified toolbar — leave room for the traffic-light buttons. */
+[data-platform="macos"] .tabs {
+  height: 40px;
+  padding-left: 80px;
+  padding-top: 10px;
+  padding-right: 8px;
+}
+
 .tab {
   display: flex;
   align-items: center;

@@ -1,4 +1,6 @@
 // Jotpad backend: multi-encoding file I/O + persistent state (drafts/settings/recents).
+mod menu;
+
 use encoding_rs::{BIG5, EUC_KR, GBK, SHIFT_JIS, UTF_8, UTF_16BE, UTF_16LE, WINDOWS_1252, Encoding};
 use serde::Serialize;
 use std::fs;
@@ -182,6 +184,15 @@ fn write_state(app: tauri::AppHandle, state: serde_json::Value) -> Result<(), St
     Ok(())
 }
 
+#[tauri::command]
+fn set_app_menu(
+    app: tauri::AppHandle,
+    window: tauri::WebviewWindow,
+    menus: Vec<menu::MenuNode>,
+) -> Result<(), String> {
+    menu::apply(&app, &window, menus).map_err(|e| e.to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -191,8 +202,10 @@ pub fn run() {
             read_file,
             write_file,
             read_state,
-            write_state
+            write_state,
+            set_app_menu
         ])
+        .on_menu_event(|app, event| menu::handle_event(app, event))
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

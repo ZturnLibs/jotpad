@@ -6,6 +6,7 @@ import { basename } from "@/lib/backend";
 import { clamp, platform } from "@/lib/utils";
 import { getEditorView } from "@/lib/editorRef";
 import { insertAtCursor, timeDateString } from "@/lib/edit";
+import { applyNativeMenu, startNativeMenuListener } from "@/lib/platformMenu";
 import { TabBar } from "@/components/TabBar";
 import { MenuBar } from "@/components/MenuBar";
 import { Toolbar } from "@/components/Toolbar";
@@ -13,6 +14,7 @@ import { Editor } from "@/components/Editor";
 import { FindBar } from "@/components/FindBar";
 import { StatusBar } from "@/components/StatusBar";
 import { Settings } from "@/components/Settings";
+import { ContextMenu } from "@/components/ContextMenu";
 import { About, ConfirmDialog, GotoDialog } from "@/components/Dialogs";
 
 function applyTheme(mode: "light" | "dark" | "system") {
@@ -30,13 +32,29 @@ export function App() {
   const init = useStore((s) => s.init);
   const theme = useStore((s) => s.settings.theme);
   const locale = useStore((s) => s.settings.locale);
+  const settings = useStore((s) => s.settings);
+  const activeTabId = useStore((s) => s.activeTabId);
+  const tabsLen = useStore((s) => s.tabs.length);
   const activeTab = useStore((s) => s.tabs.find((t) => t.id === s.activeTabId));
   const t = useT();
+  const isMac = platform() === "macos";
 
   // Boot: load persisted state.
   useEffect(() => {
     void init();
   }, [init]);
+
+  // Expose the platform on <html> for platform-specific CSS.
+  useEffect(() => {
+    document.documentElement.dataset.platform = platform();
+  }, []);
+
+  // macOS: drive the native system menu bar.
+  useEffect(() => {
+    if (!isMac || !ready) return;
+    void startNativeMenuListener();
+    void applyNativeMenu();
+  }, [isMac, ready, settings, activeTabId, tabsLen]);
 
   // Apply theme; react to system changes when in "system" mode.
   useEffect(() => {
@@ -218,13 +236,14 @@ export function App() {
   return (
     <div className="app">
       <TabBar />
-      <MenuBar />
+      {!isMac && <MenuBar />}
       <Toolbar />
       <div className="editor-wrap-host" style={{ flex: 1, position: "relative", minHeight: 0 }}>
         <Editor />
         <FindBar />
       </div>
       <StatusBar />
+      <ContextMenu />
       <ConfirmDialog />
       <GotoDialog />
       <Settings />

@@ -1,0 +1,70 @@
+// Drives the native macOS menu bar: serializes the shared menu model into the
+// Rust menu tree, and dispatches click events back to runMenuAction.
+import { invoke } from "@tauri-apps/api/core";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { getMenuModel, runMenuAction, type MenuItemModel } from "@/lib/menuActions";
+
+interface MenuDef {
+  type: "item" | "check" | "separator" | "submenu";
+  id?: string;
+  text?: string;
+  accelerator?: string;
+  checked?: boolean;
+  enabled?: boolean;
+  items?: MenuDef[];
+}
+
+function toDefs(items: MenuItemModel[]): MenuDef[] {
+  return items.map((it): MenuDef => {
+    if (it.sep) return { type: "separator" };
+    if (it.submenu) {
+      return {
+        type: "submenu",
+        text: it.label,
+        enabled: it.disabled !== true,
+        items: toDefs(it.submenu),
+      };
+    }
+    if (it.checked !== undefined) {
+      return {
+        type: "check",
+        id: it.id,
+        text: it.label,
+        checked: !!it.checked,
+        enabled: it.disabled !== true,
+      };
+    }
+    return {
+      type: "item",
+      id: it.id,
+      text: it.label,
+      accelerator: it.accel,
+      enabled: it.disabled !== true,
+    };
+  });
+}
+
+/** Rebuild the native menu from the current app state. */
+export async function applyNativeMenu(): Promise<void> {
+  const model = getMenuModel();
+  const menus: MenuDef[] = [
+    { type: "submenu", text: model.fileLabel, items: toDefs(model.file) },
+    { type: "submenu", text: model.editLabel, items: toDefs(model.edit) },
+    { type: "submenu", text: model.viewLabel, items: toDefs(model.view) },
+  ];
+  try {
+    await invoke("set_app_menu", { menus });
+  } catch (e) {
+    console.error("set_app_menu failed", e);
+  }
+}
+
+let unlisten: UnlistenFn | undefined;
+
+/** Subscribe to native menu clicks. */
+export async function startNativeMenuListener(): Promise<void> {
+  if (unlisten) return;
+  unlisten = await listen<string>("menu://click", (e) => {
+    runMenuAction(e.payload);
+  });
+}

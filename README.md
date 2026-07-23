@@ -71,6 +71,16 @@ src/
 src-tauri/src/lib.rs     # Rust 后端：多编码读写 read_file/write_file + 草稿状态 read_state/write_state
 ```
 
+## 平台适配
+
+菜单与窗口控件按平台原生习惯适配：
+
+- **macOS**：菜单显示在屏幕顶部系统菜单栏（原生 `muda` 菜单，含应用菜单 / ⌘ 快捷键符号 / `Cmd+Q` 退出走草稿流程）；窗口使用 **Overlay 标题栏**（Unified Toolbar），标签栏延伸进标题栏区域，左侧为红绿灯按钮预留空间；编辑区支持右键上下文菜单。
+- **Windows / Linux**：保留窗口内自定义菜单（文件 / 编辑 / 查看，Win11 风格），与标签栏、工具栏融合；同样支持右键上下文菜单。
+- 快捷键修饰键自动按平台区分（macOS ⌘ / Windows·Linux Ctrl）。
+
+菜单逻辑、动作分发、右键菜单共用同一份模型（`src/lib/menuActions.ts`），各平台仅表现层不同。
+
 ## 数据存储
 
 草稿（所有标签页内容、光标、滚动位置、设置、最近文件）以 JSON 原子写入各平台应用数据目录：
