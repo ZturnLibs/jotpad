@@ -84,7 +84,6 @@ const zhCN: Dict = {
   "tab.untitled": "新建",
   "tab.rename": "重命名",
   "tab.unsaved": "未保存",
-  "tab.more": "更多标签",
 
   // Find / Replace
   "find.find": "查找",
@@ -217,7 +216,6 @@ const en: Dict = {
   "tab.untitled": "Untitled",
   "tab.rename": "Rename",
   "tab.unsaved": "Unsaved",
-  "tab.more": "More tabs",
 
   "find.find": "Find",
   "find.placeholder": "Find",

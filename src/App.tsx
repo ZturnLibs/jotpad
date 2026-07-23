@@ -278,13 +278,19 @@ export function App() {
 
   return (
     <div className="app">
-      <TabBar />
-      <Toolbar />
-      <div className="editor-wrap-host" style={{ flex: 1, position: "relative", minHeight: 0 }}>
-        <Editor />
-        <FindBar />
+      <div className="app-body">
+        <aside className="sidebar">
+          <TabBar />
+        </aside>
+        <main className="main">
+          <Toolbar />
+          <div className="editor-wrap-host" style={{ flex: 1, position: "relative", minHeight: 0 }}>
+            <Editor />
+            <FindBar />
+          </div>
+          <StatusBar />
+        </main>
       </div>
-      <StatusBar />
       <ContextMenu />
       <ConfirmDialog />
       <GotoDialog />

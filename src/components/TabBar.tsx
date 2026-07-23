@@ -15,12 +15,9 @@ export function TabBar() {
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
-  const [hasOverflow, setHasOverflow] = useState(false);
-  const [overflowOpen, setOverflowOpen] = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const overflowRef = useRef<HTMLDivElement>(null);
   const skipCommit = useRef(false);
   /** Ignore blur right after entering rename (dblclick can steal focus). */
   const armedAt = useRef(0);
@@ -33,49 +30,18 @@ export function TabBar() {
     [t],
   );
 
-  const measureOverflow = useCallback(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    // 1px slack avoids flicker from subpixel rounding.
-    setHasOverflow(el.scrollWidth > el.clientWidth + 1);
-  }, []);
-
   const scrollActiveIntoView = useCallback(() => {
     const root = scrollRef.current;
     if (!root || !activeTabId) return;
     const el = root.querySelector<HTMLElement>(`[data-tab-id="${activeTabId}"]`);
-    el?.scrollIntoView({ inline: "nearest", block: "nearest" });
+    el?.scrollIntoView({ block: "nearest", inline: "nearest" });
   }, [activeTabId]);
 
   useEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    measureOverflow();
-    const ro = new ResizeObserver(() => {
-      measureOverflow();
-      scrollActiveIntoView();
-    });
-    ro.observe(el);
-    // Also watch content width changes (tabs added/removed/renamed).
-    const mo = new MutationObserver(() => measureOverflow());
-    mo.observe(el, { childList: true, subtree: true, characterData: true });
-    el.addEventListener("scroll", measureOverflow, { passive: true });
-    return () => {
-      ro.disconnect();
-      mo.disconnect();
-      el.removeEventListener("scroll", measureOverflow);
-    };
-  }, [measureOverflow, scrollActiveIntoView, tabs.length]);
-
-  useEffect(() => {
     scrollActiveIntoView();
-    // Re-measure after layout settles from tab switch / open.
-    const id = window.requestAnimationFrame(() => {
-      measureOverflow();
-      scrollActiveIntoView();
-    });
+    const id = window.requestAnimationFrame(scrollActiveIntoView);
     return () => window.cancelAnimationFrame(id);
-  }, [activeTabId, tabs.length, measureOverflow, scrollActiveIntoView]);
+  }, [activeTabId, tabs.length, scrollActiveIntoView]);
 
   useEffect(() => {
     if (!editingId) return;
@@ -90,42 +56,6 @@ export function TabBar() {
     return () => window.clearTimeout(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editingId]);
-
-  useEffect(() => {
-    if (!hasOverflow) setOverflowOpen(false);
-  }, [hasOverflow]);
-
-  useEffect(() => {
-    if (!overflowOpen) return;
-    const onDown = (e: MouseEvent) => {
-      if (overflowRef.current && !overflowRef.current.contains(e.target as Node)) {
-        setOverflowOpen(false);
-      }
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOverflowOpen(false);
-    };
-    document.addEventListener("mousedown", onDown);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onDown);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [overflowOpen]);
-
-  // Vertical wheel → horizontal scroll on the tab strip.
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    const onWheel = (e: WheelEvent) => {
-      if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
-      if (el.scrollWidth <= el.clientWidth) return;
-      e.preventDefault();
-      el.scrollLeft += e.deltaY;
-    };
-    el.addEventListener("wheel", onWheel, { passive: false });
-    return () => el.removeEventListener("wheel", onWheel);
-  }, []);
 
   const startRename = (id: string, filePath: string) => {
     skipCommit.current = false;
@@ -156,14 +86,10 @@ export function TabBar() {
     await renameTab(id, name);
   };
 
-  const pickTab = (id: string) => {
-    setOverflowOpen(false);
-    setActiveTab(id);
-  };
-
   return (
     <div className="tabs">
-      <div className="tabs-scroll" ref={scrollRef}>
+      <div className="tabs-drag" data-tauri-drag-region />
+      <div className="tabs-scroll" ref={scrollRef} role="tablist" aria-orientation="vertical">
         {tabs.map((tab) => {
           const active = tab.id === activeTabId;
           const title = tabLabel(tab);
@@ -172,6 +98,7 @@ export function TabBar() {
             <div
               key={tab.id}
               data-tab-id={tab.id}
+              role="tab"
               className={
                 "tab" +
                 (active ? " active" : "") +
@@ -211,6 +138,7 @@ export function TabBar() {
                   : (tab.filePath ?? title)
               }
               aria-current={active ? "page" : undefined}
+              aria-selected={active}
             >
               {editing ? (
                 <input
@@ -271,60 +199,8 @@ export function TabBar() {
         aria-label={t("tab.new")}
       >
         <Icon name="plus" size={16} />
+        <span className="tab-new-label">{t("tab.new")}</span>
       </button>
-
-      {hasOverflow && (
-        <div className="tabs-overflow" ref={overflowRef}>
-          <button
-            className={"tab-overflow-btn" + (overflowOpen ? " open" : "")}
-            onClick={() => setOverflowOpen((v) => !v)}
-            title={t("tab.more")}
-            aria-label={t("tab.more")}
-            aria-expanded={overflowOpen}
-            aria-haspopup="listbox"
-          >
-            <Icon name="chevronDown" size={16} />
-          </button>
-          {overflowOpen && (
-            <div className="tabs-overflow-menu" role="listbox">
-              {tabs.map((tab) => {
-                const active = tab.id === activeTabId;
-                const title = tabLabel(tab);
-                return (
-                  <button
-                    key={tab.id}
-                    type="button"
-                    role="option"
-                    aria-selected={active}
-                    className={
-                      "tabs-overflow-item" +
-                      (active ? " active" : "") +
-                      (tab.dirty ? " dirty" : "")
-                    }
-                    title={tab.filePath ?? title}
-                    onClick={() => pickTab(tab.id)}
-                  >
-                    <span className="tabs-overflow-check">
-                      {active ? <Icon name="check" size={14} /> : null}
-                    </span>
-                    <span className="tabs-overflow-label">{title}</span>
-                    {tab.dirty && (
-                      <span
-                        className="tab-dot tabs-overflow-dot"
-                        title={t("tab.unsaved")}
-                        aria-label={t("tab.unsaved")}
-                        role="img"
-                      />
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      )}
-
-      <div className="tabs-spacer" data-tauri-drag-region />
     </div>
   );
 }
