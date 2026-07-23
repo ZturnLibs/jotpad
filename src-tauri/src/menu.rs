@@ -3,7 +3,7 @@
 // rebuilds it and forwards clicks.
 use serde::Deserialize;
 use tauri::menu::{CheckMenuItemBuilder, MenuItemBuilder, MenuBuilder, SubmenuBuilder};
-use tauri::{Emitter, Manager, Runtime, WebviewWindow};
+use tauri::{AppHandle, Emitter, Manager, Runtime};
 
 #[derive(Deserialize)]
 #[serde(tag = "type", rename_all = "lowercase")]
@@ -109,17 +109,12 @@ fn build_submenu<R: Runtime, M: Manager<R>>(
     b.build()
 }
 
-/// Build the menu tree and apply it to the given window.
-pub fn apply<R: Runtime, M: Manager<R>>(
-    app: &M,
-    window: &WebviewWindow<R>,
-    nodes: Vec<MenuNode>,
-) -> tauri::Result<()> {
-    eprintln!(
-        "[menu] apply: {} top-level menus, target window label = {:?}",
-        nodes.len(),
-        window.label()
-    );
+/// Build the menu tree and set it as the app-wide menu.
+/// On macOS, `Window::set_menu` is a no-op — the system menu bar requires
+/// `AppHandle::set_menu`. On Windows/Linux, `AppHandle::set_menu` also
+/// attaches the menu to windows that do not already have one.
+pub fn apply<R: Runtime>(app: &AppHandle<R>, nodes: Vec<MenuNode>) -> tauri::Result<()> {
+    eprintln!("[menu] apply: {} top-level menus", nodes.len());
     let mut mb = MenuBuilder::new(app);
     for node in &nodes {
         if let MenuNode::Submenu { text, items, enabled } = node {
@@ -129,7 +124,7 @@ pub fn apply<R: Runtime, M: Manager<R>>(
         }
     }
     let menu = mb.build()?;
-    window.set_menu(menu)?;
+    app.set_menu(menu)?;
     eprintln!("[menu] set_menu OK");
     Ok(())
 }

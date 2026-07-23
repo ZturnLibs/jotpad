@@ -187,11 +187,10 @@ fn write_state(app: tauri::AppHandle, state: serde_json::Value) -> Result<(), St
 #[tauri::command]
 fn set_app_menu(
     app: tauri::AppHandle,
-    window: tauri::WebviewWindow,
     menus: Vec<menu::MenuNode>,
 ) -> Result<(), String> {
     eprintln!("[menu] set_app_menu invoked: {} top menus", menus.len());
-    menu::apply(&app, &window, menus).map_err(|e| {
+    menu::apply(&app, menus).map_err(|e| {
         eprintln!("[menu] apply ERROR: {e}");
         e.to_string()
     })
@@ -243,14 +242,10 @@ pub fn run() {
         ])
         .on_menu_event(|app, event| menu::handle_event(app, event))
         .setup(|app| {
-            // Establish the menu at launch so the macOS menu bar is populated
-            // immediately (runtime set_menu on macOS does not reliably refresh
-            // an already-shown main menu).
-            if let Some(window) = app.get_webview_window("main") {
-                let menu = menu::default_menu(app)?;
-                window.set_menu(menu)?;
-                eprintln!("[menu] startup menu set on main window");
-            }
+            // App-wide menu (required on macOS; Window::set_menu is a no-op there).
+            let menu = menu::default_menu(app)?;
+            app.set_menu(menu)?;
+            eprintln!("[menu] startup app menu set");
             Ok(())
         })
         .run(tauri::generate_context!())
