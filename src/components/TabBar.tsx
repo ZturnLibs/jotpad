@@ -25,6 +25,7 @@ export function TabBar() {
               if (e.button === 1) requestClose(tab.id);
             }}
             title={tab.filePath ?? title}
+            aria-current={active ? "page" : undefined}
           >
             <span className="tab-title">{title}</span>
             <button
