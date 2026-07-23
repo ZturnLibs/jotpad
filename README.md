@@ -5,8 +5,9 @@ Jotpad 是一款用 **Tauri 2 + React + TypeScript + CodeMirror 6** 构建的跨
 - 🪟 多标签页、草稿自动保存与恢复
 - 🔤 多编码读写（UTF-8 / UTF-16 / GBK / Big5 / Shift-JIS / EUC-KR / Windows-1252，自动检测 + BOM）
 - 🔍 查找 / 替换（区分大小写、正则、匹配计数）
-- 🎨 字体 / 字号 / 加粗 / 斜体 / 下划线 / 删除线，缩放，自动换行
+- 🎨 字体 / 字号 / 加粗 / 斜体 / 下划线 / 删除线，缩放，自动换行，强调色（跟随系统 / 自定义）
 - 🌗 浅色 / 深色 / 跟随系统主题
+- 🪟 原生菜单适配（macOS 顶部系统菜单 / Linux GTK 菜单条 / Windows 自定义）
 - 🌐 中文 / English 界面，可扩展
 - ⌨️ 完整快捷键
 - 🖱️ 拖拽文件打开
@@ -27,6 +28,8 @@ pnpm tauri build --debug --no-bundle
 ```
 
 > 构建需要 Rust 工具链与各平台 WebView 运行时（macOS 自带；Linux 需 `webkit2gtk`；Windows 自带 WebView2）。
+>
+> 重新生成应用图标（从 `app-icon.svg`）：`pnpm exec node scripts/gen-icon.mjs && pnpm tauri icon app-icon.png`
 
 ## 快捷键
 

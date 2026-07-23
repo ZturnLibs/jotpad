@@ -1,6 +1,6 @@
 import { useStore } from "@/store/useStore";
 import { useT } from "@/lib/i18n";
-import { FONT_PRESETS, type Locale, type ThemeMode } from "@/types";
+import { ACCENT_PRESETS, FONT_PRESETS, type Locale, type ThemeMode } from "@/types";
 import { clamp } from "@/lib/utils";
 
 function firstName(f: string): string {
@@ -72,6 +72,25 @@ export function Settings() {
                 { value: "system", label: t("view.themeSystem") },
               ]}
             />
+          </div>
+          <div className="field">
+            <label>{t("settings.accent")}</label>
+            <div className="swatches">
+              {ACCENT_PRESETS.map((c) => (
+                <button
+                  key={c}
+                  className={"swatch" + (settings.accent === c ? " active" : "")}
+                  title={c === "system" ? t("view.themeSystem") : c}
+                  style={
+                    c === "system"
+                      ? { background: "linear-gradient(135deg,#2AA8FF,#6750A4)" }
+                      : { background: c }
+                  }
+                  onClick={() => setSettings({ accent: c })}
+                  aria-label={c}
+                />
+              ))}
+            </div>
           </div>
         </section>
 

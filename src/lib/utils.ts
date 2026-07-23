@@ -38,3 +38,30 @@ export function isMod(e: KeyboardEvent | MouseEvent): boolean {
 
 export const MOD = platform() === "macos" ? "Cmd" : "Ctrl";
 export const ALT = platform() === "macos" ? "Option" : "Alt";
+
+// --- color helpers (for accent theming) ---
+
+export function rgbToHex(r: number, g: number, b: number): string {
+  const h = (n: number) => clamp(Math.round(n), 0, 255).toString(16).padStart(2, "0");
+  return `#${h(r)}${h(g)}${h(b)}`;
+}
+
+export function darken(hex: string, amount: number): string {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
+  if (!m) return hex;
+  const n = parseInt(m[1], 16);
+  const r = Math.max(0, ((n >> 16) & 255) - amount);
+  const g = Math.max(0, ((n >> 8) & 255) - amount);
+  const b = Math.max(0, (n & 255) - amount);
+  return rgbToHex(r, g, b);
+}
+
+export function lighten(hex: string, amount: number): string {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
+  if (!m) return hex;
+  const n = parseInt(m[1], 16);
+  const r = Math.min(255, ((n >> 16) & 255) + amount);
+  const g = Math.min(255, ((n >> 8) & 255) + amount);
+  const b = Math.min(255, (n & 255) + amount);
+  return rgbToHex(r, g, b);
+}

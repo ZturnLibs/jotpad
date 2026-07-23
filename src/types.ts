@@ -63,6 +63,7 @@ export interface AppSettings {
   wordWrap: boolean;
   zoom: number; // percent
   showStatusBar: boolean;
+  accent: string; // "system" or hex like "#0067C0"
 }
 
 export interface AppState {
@@ -85,7 +86,20 @@ export const DEFAULT_SETTINGS: AppSettings = {
   wordWrap: true,
   zoom: 100,
   showStatusBar: true,
+  accent: "system",
 };
+
+/** Accent color presets shown in Settings. "system" follows the OS accent. */
+export const ACCENT_PRESETS: string[] = [
+  "system",
+  "#0067C0",
+  "#007AFF",
+  "#6750A4",
+  "#107C10",
+  "#C42B1C",
+  "#CA5010",
+  "#603D83",
+];
 
 export const FONT_PRESETS = [
   "Cascadia Code, Consolas, Menlo, Monaco, monospace",

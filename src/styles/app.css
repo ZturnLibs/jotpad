@@ -639,6 +639,28 @@ textarea {
   box-shadow: var(--shadow-bar);
 }
 
+/* Accent swatches */
+.swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.swatch {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid var(--border-strong);
+  cursor: pointer;
+  transition: transform var(--transition), box-shadow var(--transition);
+}
+.swatch:hover {
+  transform: scale(1.1);
+}
+.swatch.active {
+  box-shadow: 0 0 0 2px var(--bg-elevated), 0 0 0 4px var(--accent);
+  border-color: transparent;
+}
+
 /* ---------- Context menu ---------- */
 .context-menu {
   position: fixed;

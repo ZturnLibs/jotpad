@@ -124,6 +124,7 @@ const zhCN: Dict = {
   "settings.behavior": "行为",
   "settings.showStatusBar": "显示状态栏",
   "settings.wordWrap": "自动换行",
+  "settings.accent": "强调色",
 
   // Misc
   "misc.emptyHint": "新建一个标签页开始编写",
@@ -239,6 +240,7 @@ const en: Dict = {
   "settings.behavior": "Behavior",
   "settings.showStatusBar": "Show status bar",
   "settings.wordWrap": "Word wrap",
+  "settings.accent": "Accent color",
 
   "misc.emptyHint": "Create a new tab to start writing",
   "misc.about": "About Jotpad",

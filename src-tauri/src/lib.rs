@@ -193,6 +193,37 @@ fn set_app_menu(
     menu::apply(&app, &window, menus).map_err(|e| e.to_string())
 }
 
+/// Best-effort system accent color as [r, g, b].
+#[tauri::command]
+fn get_system_accent() -> [u8; 3] {
+    system_accent()
+}
+
+#[cfg(windows)]
+fn system_accent() -> [u8; 3] {
+    use winreg::enums::*;
+    use winreg::RegKey;
+    let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+    if let Ok(colors) = hkcu.open_subkey("Control Panel\\Colors") {
+        if let Ok(val) = colors.get_value::<String, _>("Hilight") {
+            let parts: Vec<&str> = val.split_whitespace().collect();
+            if parts.len() == 3 {
+                let r = parts[0].parse::<u8>().unwrap_or(0);
+                let g = parts[1].parse::<u8>().unwrap_or(103);
+                let b = parts[2].parse::<u8>().unwrap_or(192);
+                return [r, g, b];
+            }
+        }
+    }
+    [0, 120, 212]
+}
+
+#[cfg(not(windows))]
+fn system_accent() -> [u8; 3] {
+    // Default Jotpad blue; close to macOS/Windows system blue.
+    [0, 120, 212]
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -203,7 +234,8 @@ pub fn run() {
             write_file,
             read_state,
             write_state,
-            set_app_menu
+            set_app_menu,
+            get_system_accent
         ])
         .on_menu_event(|app, event| menu::handle_event(app, event))
         .run(tauri::generate_context!())

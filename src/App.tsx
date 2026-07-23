@@ -2,8 +2,8 @@ import { useEffect } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useStore } from "@/store/useStore";
 import { useT } from "@/lib/i18n";
-import { basename } from "@/lib/backend";
-import { clamp, platform } from "@/lib/utils";
+import { basename, getSystemAccent } from "@/lib/backend";
+import { clamp, darken, lighten, platform, rgbToHex } from "@/lib/utils";
 import { getEditorView } from "@/lib/editorRef";
 import { insertAtCursor, timeDateString } from "@/lib/edit";
 import { applyNativeMenuDebounced, startNativeMenuListener } from "@/lib/platformMenu";
@@ -67,6 +67,44 @@ export function App() {
       return () => mq.removeEventListener("change", handler);
     }
   }, [theme]);
+
+  // Apply accent color (follow system or custom), theme-aware contrast.
+  useEffect(() => {
+    let cancelled = false;
+    const effective =
+      theme === "system"
+        ? window.matchMedia("(prefers-color-scheme: dark)").matches
+          ? "dark"
+          : "light"
+        : theme;
+    void (async () => {
+      let hex = settings.accent;
+      if (hex === "system") {
+        try {
+          const [r, g, b] = await getSystemAccent();
+          hex = rgbToHex(r, g, b);
+        } catch {
+          hex = "#0067C0";
+        }
+      }
+      if (cancelled) return;
+      const acc = effective === "dark" ? lighten(hex, 72) : hex;
+      const hover = effective === "dark" ? lighten(hex, 96) : darken(hex, 20);
+      const root = document.documentElement.style;
+      root.setProperty("--accent", acc);
+      root.setProperty("--accent-hover", hover);
+      const m = /^#?([0-9a-f]{6})$/i.exec(acc);
+      let lum = 128;
+      if (m) {
+        const n = parseInt(m[1], 16);
+        lum = (((n >> 16) & 255) * 299 + ((n >> 8) & 255) * 587 + (n & 255) * 114) / 1000;
+      }
+      root.setProperty("--accent-contrast", lum > 145 ? "#0a0a0a" : "#ffffff");
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [settings.accent, theme]);
 
   // Update window title with the active document.
   useEffect(() => {

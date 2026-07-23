@@ -39,6 +39,11 @@ export function writeState(state: AppState): Promise<void> {
   return invoke<void>("write_state", { state });
 }
 
+/** Best-effort system accent color as [r, g, b]. */
+export function getSystemAccent(): Promise<[number, number, number]> {
+  return invoke<[number, number, number]>("get_system_accent");
+}
+
 /** Show the OS "open file" dialog. Returns a path or null. */
 export async function pickOpenFile(): Promise<string | null> {
   const result = await openDialog({
