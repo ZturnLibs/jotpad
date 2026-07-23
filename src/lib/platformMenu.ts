@@ -2,6 +2,7 @@
 // Rust menu tree, and dispatches click events back to runMenuAction.
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { debounce } from "@/lib/utils";
 import { getMenuModel, runMenuAction, type MenuItemModel } from "@/lib/menuActions";
 
 interface MenuDef {
@@ -60,6 +61,11 @@ export async function applyNativeMenu(): Promise<void> {
 }
 
 let unlisten: UnlistenFn | undefined;
+
+/** Debounced native menu rebuild — coalesces rapid state changes (e.g. tab switches). */
+export const applyNativeMenuDebounced = debounce(() => {
+  void applyNativeMenu();
+}, 120);
 
 /** Subscribe to native menu clicks. */
 export async function startNativeMenuListener(): Promise<void> {

@@ -6,7 +6,7 @@ import { basename } from "@/lib/backend";
 import { clamp, platform } from "@/lib/utils";
 import { getEditorView } from "@/lib/editorRef";
 import { insertAtCursor, timeDateString } from "@/lib/edit";
-import { applyNativeMenu, startNativeMenuListener } from "@/lib/platformMenu";
+import { applyNativeMenuDebounced, startNativeMenuListener } from "@/lib/platformMenu";
 import { TabBar } from "@/components/TabBar";
 import { MenuBar } from "@/components/MenuBar";
 import { Toolbar } from "@/components/Toolbar";
@@ -37,7 +37,8 @@ export function App() {
   const tabsLen = useStore((s) => s.tabs.length);
   const activeTab = useStore((s) => s.tabs.find((t) => t.id === s.activeTabId));
   const t = useT();
-  const isMac = platform() === "macos";
+  // macOS + Linux use the native menu bar; Windows keeps the custom in-window menu.
+  const useNativeMenu = platform() === "macos" || platform() === "linux";
 
   // Boot: load persisted state.
   useEffect(() => {
@@ -49,12 +50,12 @@ export function App() {
     document.documentElement.dataset.platform = platform();
   }, []);
 
-  // macOS: drive the native system menu bar.
+  // macOS / Linux: drive the native menu bar.
   useEffect(() => {
-    if (!isMac || !ready) return;
+    if (!useNativeMenu || !ready) return;
     void startNativeMenuListener();
-    void applyNativeMenu();
-  }, [isMac, ready, settings, activeTabId, tabsLen]);
+    applyNativeMenuDebounced();
+  }, [useNativeMenu, ready, settings, activeTabId, tabsLen]);
 
   // Apply theme; react to system changes when in "system" mode.
   useEffect(() => {
@@ -236,7 +237,7 @@ export function App() {
   return (
     <div className="app">
       <TabBar />
-      {!isMac && <MenuBar />}
+      {!useNativeMenu && <MenuBar />}
       <Toolbar />
       <div className="editor-wrap-host" style={{ flex: 1, position: "relative", minHeight: 0 }}>
         <Editor />
