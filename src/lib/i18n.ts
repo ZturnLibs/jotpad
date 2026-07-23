@@ -129,7 +129,7 @@ const zhCN: Dict = {
   // Misc
   "misc.emptyHint": "新建一个标签页开始编写",
   "misc.about": "关于 Jotpad",
-  "misc.aboutText": "Jotpad — 跨平台记事本\n灵感来自 Windows 11 记事本",
+  "misc.aboutText": "跨平台记事本，灵感来自 Windows 11 记事本",
 };
 
 const en: Dict = {
@@ -244,7 +244,7 @@ const en: Dict = {
 
   "misc.emptyHint": "Create a new tab to start writing",
   "misc.about": "About Jotpad",
-  "misc.aboutText": "Jotpad — a cross-platform notepad\ninspired by Windows 11 Notepad",
+  "misc.aboutText": "A cross-platform notepad, inspired by Windows 11 Notepad",
 };
 
 const DICTS: Record<Locale, Dict> = {

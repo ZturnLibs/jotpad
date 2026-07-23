@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { EditorView } from "@codemirror/view";
+import { getVersion } from "@tauri-apps/api/app";
 import { useStore } from "@/store/useStore";
 import { useT } from "@/lib/i18n";
 import { basename } from "@/lib/backend";
 import { getEditorView } from "@/lib/editorRef";
+import logo from "@/assets/logo.svg";
 
 /** "Do you want to save?" confirmation (also used for exit). */
 export function ConfirmDialog() {
@@ -119,15 +121,25 @@ export function About() {
   const open = useStore((s) => s.aboutOpen);
   const setOpen = useStore((s) => s.setAboutOpen);
   const t = useT();
+  const [version, setVersion] = useState("");
+  useEffect(() => {
+    if (open) {
+      getVersion()
+        .then((v) => setVersion(v))
+        .catch(() => setVersion(""));
+    }
+  }, [open]);
   if (!open) return null;
   return (
     <div
       className="overlay"
       onMouseDown={(e) => e.target === e.currentTarget && setOpen(false)}
     >
-      <div className="dialog" style={{ minWidth: 320 }}>
-        <h3>Jotpad</h3>
-        <p style={{ whiteSpace: "pre-line" }}>{t("misc.aboutText")}</p>
+      <div className="dialog about-dialog">
+        <img className="about-logo" src={logo} alt="Jotpad" draggable={false} />
+        <h3 className="about-title">Jotpad</h3>
+        <p className="about-desc">{t("misc.aboutText")}</p>
+        {version ? <p className="about-version muted">v{version}</p> : null}
         <div className="dialog-actions">
           <button className="btn primary" onClick={() => setOpen(false)}>
             {t("dialog.cancel")}
