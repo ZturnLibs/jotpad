@@ -82,6 +82,8 @@ const zhCN: Dict = {
   "tab.close": "关闭标签页",
   "tab.closeOthers": "关闭其他标签页",
   "tab.untitled": "新建",
+  "tab.rename": "重命名",
+  "tab.unsaved": "未保存",
 
   // Find / Replace
   "find.find": "查找",
@@ -212,6 +214,8 @@ const en: Dict = {
   "tab.close": "Close Tab",
   "tab.closeOthers": "Close Other Tabs",
   "tab.untitled": "Untitled",
+  "tab.rename": "Rename",
+  "tab.unsaved": "Unsaved",
 
   "find.find": "Find",
   "find.placeholder": "Find",

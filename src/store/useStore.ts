@@ -12,7 +12,7 @@ import type {
 } from "@/types";
 import { DEFAULT_SETTINGS } from "@/types";
 import * as api from "@/lib/backend";
-import { basename } from "@/lib/backend";
+import { basename, dirname, joinPath } from "@/lib/backend";
 
 const STATE_VERSION = 1;
 const MAX_RECENT = 20;
@@ -63,6 +63,8 @@ interface Store {
   saveTab: (id: string) => Promise<boolean>;
   saveAsTab: (id: string) => Promise<boolean>;
   saveTabs: (ids: string[]) => Promise<boolean>;
+  /** Rename an on-disk tab by new file name (same directory). */
+  renameTab: (id: string, newName: string) => Promise<boolean>;
 
   // Settings
   setSettings: (patch: Partial<AppSettings>) => void;
@@ -319,6 +321,45 @@ export const useStore = create<Store>((set, get) => ({
       }
     }
     return true;
+  },
+
+  renameTab: async (id, newName) => {
+    const tab = get().tabs.find((t) => t.id === id);
+    if (!tab?.filePath) return false;
+    const name = newName.trim();
+    if (!name || /[/\\]/.test(name) || name === "." || name === "..") {
+      await api.nativeMessage("Jotpad", get().settings.locale === "zh-CN"
+        ? "文件名无效"
+        : "Invalid file name");
+      return false;
+    }
+    const oldPath = tab.filePath;
+    if (basename(oldPath) === name) return true;
+    const newPath = joinPath(dirname(oldPath), name);
+    if (get().tabs.some((t) => t.id !== id && t.filePath === newPath)) {
+      await api.nativeMessage("Jotpad", get().settings.locale === "zh-CN"
+        ? "该文件已在另一个标签页中打开"
+        : "That file is already open in another tab");
+      return false;
+    }
+    try {
+      await api.renameFile(oldPath, newPath);
+      get().updateTab(id, { filePath: newPath, title: name });
+      set((s) => ({
+        recentFiles: s.recentFiles.map((p) => (p === oldPath ? newPath : p)),
+      }));
+      return true;
+    } catch (e) {
+      const msg = String(e);
+      const friendly =
+        msg.includes("target exists")
+          ? get().settings.locale === "zh-CN"
+            ? "同名文件已存在"
+            : "A file with that name already exists"
+          : msg;
+      await api.nativeMessage("Jotpad", friendly);
+      return false;
+    }
   },
 
   setSettings: (patch) => set((s) => ({ settings: { ...s.settings, ...patch } })),

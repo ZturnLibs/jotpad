@@ -31,6 +31,11 @@ export function writeFile(
   });
 }
 
+/** Rename a file on disk. Fails if the destination already exists. */
+export function renameFile(from: string, to: string): Promise<void> {
+  return invoke<void>("rename_file", { from, to });
+}
+
 export function readState(): Promise<AppState | null> {
   return invoke<AppState | null>("read_state");
 }
@@ -96,4 +101,17 @@ export function basename(path: string): string {
   const norm = path.replace(/\\/g, "/");
   const idx = norm.lastIndexOf("/");
   return idx >= 0 ? norm.slice(idx + 1) : norm;
+}
+
+/** Parent directory of a path (cross-platform). Empty string if none. */
+export function dirname(path: string): string {
+  const match = /^(.*)[/\\][^/\\]*$/.exec(path);
+  return match ? match[1] : "";
+}
+
+/** Join a directory and file name, preserving the path separator style. */
+export function joinPath(dir: string, name: string): string {
+  if (!dir) return name;
+  const sep = dir.includes("\\") && !dir.includes("/") ? "\\" : "/";
+  return dir.endsWith("/") || dir.endsWith("\\") ? `${dir}${name}` : `${dir}${sep}${name}`;
 }

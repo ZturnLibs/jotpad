@@ -110,6 +110,23 @@ fn read_file(path: String) -> Result<ReadResult, String> {
 }
 
 #[tauri::command]
+fn rename_file(from: String, to: String) -> Result<(), String> {
+    let from = from.trim_start_matches("file://");
+    let to = to.trim_start_matches("file://");
+    if from == to {
+        return Ok(());
+    }
+    let to_path = std::path::Path::new(to);
+    if to_path.exists() {
+        return Err("target exists".into());
+    }
+    if let Some(parent) = to_path.parent() {
+        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    fs::rename(from, to).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 fn write_file(
     path: String,
     text: String,
@@ -235,6 +252,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             read_file,
             write_file,
+            rename_file,
             read_state,
             write_state,
             set_app_menu,
