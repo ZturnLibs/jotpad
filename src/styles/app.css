@@ -78,6 +78,7 @@ textarea {
   background: var(--bg-chrome);
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
+  min-width: 0;
 }
 
 /* macOS: unified toolbar — leave room for the traffic-light buttons. */
@@ -86,12 +87,30 @@ textarea {
   padding: 8px 8px 0 80px;
 }
 
+.tabs-scroll {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  flex: 1 1 0;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+.tabs-scroll::-webkit-scrollbar {
+  display: none;
+  height: 0;
+}
+
 .tab {
   display: flex;
   align-items: center;
   gap: 6px;
   height: 30px;
-  min-width: 120px;
+  flex: 1 1 140px;
+  min-width: 80px;
   max-width: 220px;
   padding: 0 8px 0 12px;
   border-radius: 8px 8px 0 0;
@@ -205,10 +224,88 @@ textarea {
   background: var(--bg-hover);
   color: var(--text);
 }
-.tabs-spacer {
+
+.tabs-overflow {
+  position: relative;
+  flex-shrink: 0;
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+  align-self: flex-end;
+  margin-bottom: 0;
+}
+.tab-overflow-btn {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius);
+  color: var(--text-secondary);
+}
+.tab-overflow-btn:hover,
+.tab-overflow-btn.open {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+.tabs-overflow-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  min-width: 200px;
+  max-width: min(320px, 80vw);
+  max-height: min(360px, 50vh);
+  overflow-y: auto;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-pop);
+  padding: 6px;
+  z-index: 200;
+  animation: pop 100ms ease;
+}
+.tabs-overflow-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 30px;
+  padding: 0 8px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  color: var(--text);
+  text-align: left;
+}
+.tabs-overflow-item:hover {
+  background: var(--bg-selected);
+}
+.tabs-overflow-item.active {
+  font-weight: 600;
+}
+.tabs-overflow-check {
+  width: 16px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  color: var(--accent);
+}
+.tabs-overflow-label {
   flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tabs-overflow-dot {
+  position: static;
+  inset: auto;
+  margin: 0;
+  flex-shrink: 0;
+  opacity: 0.55;
+}
+
+.tabs-spacer {
+  flex: 0 0 32px;
   align-self: stretch;
-  min-width: 24px;
+  min-width: 32px;
   -webkit-app-region: drag;
   app-region: drag;
 }
