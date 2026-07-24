@@ -133,6 +133,8 @@ const zhCN: Dict = {
   // Settings panel
   "settings.title": "设置",
   "settings.appearance": "外观",
+  "settings.editor": "编辑器",
+  "settings.general": "常规",
   "settings.language": "语言",
   "settings.font": "字体",
   "settings.fontSize": "字号",
@@ -141,6 +143,7 @@ const zhCN: Dict = {
   "settings.wordWrap": "自动换行",
   "settings.lineNumbers": "显示行号",
   "settings.accent": "强调色",
+  "settings.done": "完成",
 
   // Misc
   "misc.emptyHint": "新建一个标签页开始编写",
@@ -265,6 +268,8 @@ const en: Dict = {
 
   "settings.title": "Settings",
   "settings.appearance": "Appearance",
+  "settings.editor": "Editor",
+  "settings.general": "General",
   "settings.language": "Language",
   "settings.font": "Font",
   "settings.fontSize": "Font Size",
@@ -273,6 +278,7 @@ const en: Dict = {
   "settings.wordWrap": "Word wrap",
   "settings.lineNumbers": "Show line numbers",
   "settings.accent": "Accent color",
+  "settings.done": "Done",
 
   "misc.emptyHint": "Create a new tab to start writing",
   "misc.about": "About Jotpad",
