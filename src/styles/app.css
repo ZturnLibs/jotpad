@@ -409,9 +409,6 @@ textarea {
 .tb-select.font {
   width: 150px;
 }
-.tb-select.size {
-  width: 56px;
-}
 .tb-spacer {
   flex: 1;
 }
@@ -431,10 +428,19 @@ textarea {
   border: none;
   outline: none;
   font-size: 13px;
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+.tb-size-wrap input::-webkit-outer-spin-button,
+.tb-size-wrap input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }
 .tb-size-wrap button {
-  width: 20px;
+  width: 24px;
   height: 28px;
+  display: grid;
+  place-items: center;
   color: var(--text-secondary);
 }
 .tb-size-wrap button:hover {
@@ -447,9 +453,6 @@ textarea {
   position: relative;
   min-height: 0;
   --ef-size: 14px;
-  --ef-weight: 400;
-  --ef-style: normal;
-  --ef-deco: none;
   --ef-family: monospace;
   background: var(--editor-bg);
 }
@@ -462,6 +465,7 @@ textarea {
 }
 .cm-editor .cm-scroller {
   font-family: var(--ef-family);
+  font-size: var(--ef-size);
   line-height: 1.5;
 }
 .cm-editor.cm-focused {

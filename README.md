@@ -1,22 +1,30 @@
 # Jotpad · 跨平台记事本
 
-Jotpad 是一款用 **Tauri 2 + React + TypeScript + CodeMirror 6** 构建的跨平台（macOS / Linux / Windows）记事本，灵感来自 **Windows 11 新版记事本**。
+Jotpad 是一款用 **Tauri 2 + React + TypeScript + CodeMirror 6** 构建的跨平台（macOS / Linux / Windows）纯文本记事本。
 
-- 🪟 多标签页、草稿自动保存与恢复
-- 🔤 多编码读写（UTF-8 / UTF-16 / GBK / Big5 / Shift-JIS / EUC-KR / Windows-1252，自动检测 + BOM）
-- 🔍 查找 / 替换（区分大小写、正则、匹配计数）
-- 🎨 字体 / 字号 / 加粗 / 斜体 / 下划线 / 删除线，缩放，自动换行，强调色（跟随系统 / 自定义）
-- 🌗 浅色 / 深色 / 跟随系统主题
-- 🪟 原生菜单适配（macOS 顶部系统菜单 / Linux GTK 菜单条 / Windows 自定义）
-- 🌐 中文 / English 界面，可扩展
-- ⌨️ 完整快捷键
-- 🖱️ 拖拽文件打开
+- 左右分栏：左侧文档列表，右侧编辑区
+- 多标签页、草稿自动保存与恢复
+- 最近打开的文件（文件菜单）
+- 多编码读写（UTF-8 / UTF-16 / GBK / Big5 / Shift-JIS / EUC-KR / Windows-1252，自动检测 + BOM）
+- 外部文件变更检测（提示重新加载或保留）
+- 查找 / 替换（区分大小写、正则、匹配计数）
+- 字体 / 字号、缩放、自动换行、可选行号、强调色
+- 浅色 / 深色 / 跟随系统主题
+- 原生系统菜单（各平台 `muda` / `AppHandle::set_menu`）
+- 中文 / English 界面
+- 完整快捷键、拖拽打开文件、打印与页面设置
 
 ## 开发
 
 ```bash
 pnpm install
 pnpm tauri dev
+```
+
+单元测试：
+
+```bash
+pnpm test
 ```
 
 ## 打包
@@ -27,9 +35,20 @@ pnpm tauri build            # 产出当前平台安装包
 pnpm tauri build --debug --no-bundle
 ```
 
+### 发布前检查清单
+
+- [ ] `pnpm test` 与 `pnpm build` 通过
+- [ ] `pnpm tauri build` 在目标平台成功
+- [ ] macOS：系统菜单、Overlay 标题栏拖拽、红绿灯安全区
+- [ ] Windows：窗口菜单栏、字体/对话框、新建窗口无 Overlay 异常
+- [ ] Linux：GTK 菜单条、webkit2gtk 依赖说明
+- [ ] 打开 / 保存 / 另存为 / 重命名 / 最近文件
+- [ ] 外部修改文件后的重新加载提示
+- [ ] 未保存关闭 / 退出确认与草稿恢复
+
 > 构建需要 Rust 工具链与各平台 WebView 运行时（macOS 自带；Linux 需 `webkit2gtk`；Windows 自带 WebView2）。
 >
-> 重新生成应用图标（从 `app-icon.svg`）：`pnpm exec node scripts/gen-icon.mjs && pnpm tauri icon app-icon.png`
+> 重新生成应用图标：`pnpm icon`
 
 ## 快捷键
 
@@ -57,40 +76,27 @@ pnpm tauri build --debug --no-bundle
 
 ```
 src/
-├── App.tsx              # 布局 / 主题 / 全局快捷键 / 拖拽 / 关闭拦截
-├── main.tsx
-├── types.ts             # 共享类型与默认值
-├── store/useStore.ts    # zustand 状态：标签页、设置、文件操作、草稿持久化
-├── lib/
-│   ├── backend.ts       # Tauri 命令封装 + 系统对话框
-│   ├── i18n.ts          # 中 / 英翻译 + useT
-│   ├── search.ts        # 查找 / 替换辅助
-│   ├── edit.ts          # 剪贴板 / 光标插入 / 时间日期
-│   ├── editorRef.ts     # CodeMirror 实例桥接 + 状态栏订阅
-│   └── utils.ts
-├── components/          # TabBar / MenuBar / Toolbar / Editor / FindBar / StatusBar / Settings / Dialogs
-└── styles/              # theme.css（变量）+ app.css（布局与组件）
+├── App.tsx              # 布局 / 主题 / 快捷键 / 拖拽 / 外部变更检测
+├── store/useStore.ts    # 标签页、设置、文件、草稿、最近文件
+├── lib/                 # backend / i18n / menu / search / print / utils
+├── components/          # TabBar / Toolbar / Editor / FindBar / StatusBar / …
+└── styles/
 
-src-tauri/src/lib.rs     # Rust 后端：多编码读写 read_file/write_file + 草稿状态 read_state/write_state
+src-tauri/src/           # 多编码读写、重命名、mtime、菜单、状态持久化
 ```
 
 ## 平台适配
 
-菜单与窗口控件按平台原生习惯适配：
-
-- **macOS**：菜单显示在屏幕顶部系统菜单栏（原生 `muda` 菜单，含应用菜单 / ⌘ 快捷键符号 / `Cmd+Q` 退出走草稿流程）；窗口使用 **Overlay 标题栏**（Unified Toolbar），标签栏延伸进标题栏区域，左侧为红绿灯按钮预留空间。
-- **Linux**：使用原生 GTK 菜单条（窗口内顶部）；快捷键由菜单加速键拦截，修饰键为 Ctrl。
-- **Windows**：保留窗口内自定义菜单（文件 / 编辑 / 查看，Win11 风格），与标签栏、工具栏融合。
-- 所有平台均支持编辑区右键上下文菜单；快捷键修饰键自动按平台区分（macOS ⌘ / Windows·Linux Ctrl）。菜单重建已防抖，避免频繁切换时的闪烁。
-
-菜单逻辑、动作分发、右键菜单共用同一份模型（`src/lib/menuActions.ts`），各平台仅表现层不同。
+- **macOS**：系统菜单栏；窗口 Overlay 标题栏；侧栏顶部预留红绿灯；新建窗口同样使用 Overlay。
+- **Linux / Windows**：应用菜单挂到窗口；新建窗口使用标准装饰标题栏（非 Overlay）。
+- 菜单模型与动作分发共用 `menuActions.ts`，前端通过 `set_app_menu` 刷新原生菜单。
 
 ## 数据存储
 
-草稿（所有标签页内容、光标、滚动位置、设置、最近文件）以 JSON 原子写入各平台应用数据目录：
+草稿与设置写入应用数据目录：
 
 - macOS: `~/Library/Application Support/com.jotpad.app/jotpad-state.json`
 - Linux: `~/.local/share/com.jotpad.app/jotpad-state.json`
 - Windows: `%APPDATA%\com.jotpad.app\jotpad-state.json`
 
-未保存的修改在退出前会提示保存；即使强制退出，下次启动也会恢复草稿。
+未保存修改在退出前会提示；异常退出后下次启动可恢复草稿。

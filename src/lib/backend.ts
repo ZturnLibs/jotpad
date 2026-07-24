@@ -9,6 +9,7 @@ export interface ReadResult {
   line_ending: LineEnding;
   has_bom: boolean;
   size: number;
+  mtime_ms: number;
 }
 
 export function readFile(path: string): Promise<ReadResult> {
@@ -29,6 +30,11 @@ export function writeFile(
     lineEnding,
     withBom,
   });
+}
+
+/** On-disk modification time in milliseconds since epoch. */
+export function fileMtime(path: string): Promise<number> {
+  return invoke<number>("file_mtime", { path });
 }
 
 /** Rename a file on disk. Fails if the destination already exists. */

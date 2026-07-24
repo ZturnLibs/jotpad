@@ -17,6 +17,7 @@ import {
 } from "@/lib/edit";
 import { clamp, MOD, platform } from "@/lib/utils";
 import { loadPrintSetup, pageSizeCss } from "@/lib/print";
+import { basename } from "@/lib/backend";
 import {
   ENCODINGS,
   LINE_ENDINGS,
@@ -58,6 +59,7 @@ async function createNewWindow(): Promise<void> {
   try {
     const { WebviewWindow } = await import("@tauri-apps/api/webviewWindow");
     const label = `win-${Date.now()}`;
+    const isMac = platform() === "macos";
     const win = new WebviewWindow(label, {
       title: "Jotpad",
       width: 980,
@@ -65,8 +67,9 @@ async function createNewWindow(): Promise<void> {
       minWidth: 600,
       minHeight: 400,
       center: true,
-      titleBarStyle: "overlay",
-      hiddenTitle: true,
+      ...(isMac
+        ? { titleBarStyle: "overlay" as const, hiddenTitle: true }
+        : {}),
     });
     win.once("tauri://error", (e) => console.error("new window error", e));
   } catch (e) {
@@ -113,6 +116,19 @@ export function getMenuModel(): MenuModel {
   const t = (k: string, p?: Record<string, string | number>) => translate(locale, k, p);
   const activeTab = s.activeTab();
 
+  const recent = s.recentFiles;
+  const recentItems: MenuItemModel[] =
+    recent.length === 0
+      ? [{ id: "recentEmpty", label: t("file.recentEmpty"), disabled: true }]
+      : [
+          ...recent.slice(0, 12).map((p, i) => ({
+            id: `recent-${i}`,
+            label: basename(p),
+          })),
+          { sep: true },
+          { id: "clearRecent", label: t("file.clearRecent") },
+        ];
+
   const file: MenuItemModel[] = [
     { id: "new", label: t("file.new"), shortcut: `${MOD}+N`, accel: A("N") },
     {
@@ -122,6 +138,11 @@ export function getMenuModel(): MenuModel {
       accel: A("Shift+N"),
     },
     { id: "open", label: t("file.open"), shortcut: `${MOD}+O`, accel: A("O") },
+    {
+      id: "recent",
+      label: t("file.recent"),
+      submenu: recentItems,
+    },
     { sep: true },
     { id: "save", label: t("file.save"), shortcut: `${MOD}+S`, accel: A("S") },
     {
@@ -183,6 +204,11 @@ export function getMenuModel(): MenuModel {
       id: "wordWrap",
       label: t("view.wordWrap"),
       checked: s.settings.wordWrap,
+    },
+    {
+      id: "lineNumbers",
+      label: t("view.lineNumbers"),
+      checked: s.settings.showLineNumbers,
     },
     {
       id: "statusBar",
@@ -258,6 +284,9 @@ export function runMenuAction(id: string): void {
     case "open":
       void s.openDialog();
       break;
+    case "clearRecent":
+      s.clearRecent();
+      break;
     case "save":
       if (s.activeTabId) void s.saveTab(s.activeTabId);
       break;
@@ -329,6 +358,9 @@ export function runMenuAction(id: string): void {
     case "wordWrap":
       s.setSettings({ wordWrap: !s.settings.wordWrap });
       break;
+    case "lineNumbers":
+      s.setSettings({ showLineNumbers: !s.settings.showLineNumbers });
+      break;
     case "statusBar":
       s.setSettings({ showStatusBar: !s.settings.showStatusBar });
       break;
@@ -352,7 +384,11 @@ export function runMenuAction(id: string): void {
       s.setSettings({ locale: "en" });
       break;
     default:
-      if (id.startsWith("enc-")) {
+      if (id.startsWith("recent-")) {
+        const idx = parseInt(id.slice(7), 10);
+        const path = s.recentFiles[idx];
+        if (path) void s.openPath(path);
+      } else if (id.startsWith("enc-")) {
         s.setEncoding(id.slice(4) as Encoding);
       } else if (id.startsWith("le-")) {
         s.setLineEnding(id.slice(3) as LineEnding);

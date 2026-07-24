@@ -13,6 +13,16 @@ struct ReadResult {
     line_ending: String,
     has_bom: bool,
     size: u64,
+    mtime_ms: u64,
+}
+
+fn file_mtime_ms(path: &str) -> Result<u64, String> {
+    let meta = fs::metadata(path).map_err(|e| e.to_string())?;
+    let mtime = meta.modified().map_err(|e| e.to_string())?;
+    let dur = mtime
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_err(|e| e.to_string())?;
+    Ok(dur.as_millis() as u64)
 }
 
 /// Resolve an encoding by its display name.
@@ -95,6 +105,7 @@ fn normalize_to_lf(text: &str) -> String {
 #[tauri::command]
 fn read_file(path: String) -> Result<ReadResult, String> {
     let path = path.trim_start_matches("file://");
+    let mtime_ms = file_mtime_ms(path)?;
     let bytes = fs::read(path).map_err(|e| e.to_string())?;
     let size = bytes.len() as u64;
     let (raw, encoding, has_bom) = decode_bytes(&bytes);
@@ -106,7 +117,14 @@ fn read_file(path: String) -> Result<ReadResult, String> {
         line_ending,
         has_bom,
         size,
+        mtime_ms,
     })
+}
+
+#[tauri::command]
+fn file_mtime(path: String) -> Result<u64, String> {
+    let path = path.trim_start_matches("file://");
+    file_mtime_ms(path)
 }
 
 #[tauri::command]
@@ -252,6 +270,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             read_file,
             write_file,
+            file_mtime,
             rename_file,
             read_state,
             write_state,

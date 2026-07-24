@@ -4,7 +4,9 @@ import {
   drawSelection,
   EditorView,
   highlightActiveLine,
+  highlightActiveLineGutter,
   keymap,
+  lineNumbers,
 } from "@codemirror/view";
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { findNext, findPrevious, search } from "@codemirror/search";
@@ -15,18 +17,19 @@ export function Editor() {
   const hostRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
   const wrapCompartment = useRef(new Compartment());
-  const loadingRef = useRef(false);          // suppress setContent while loading a tab
-  const prevTabIdRef = useRef<string | null>(null); // outgoing tab id, for saving cursor
+  const guttersCompartment = useRef(new Compartment());
+  const loadingRef = useRef(false);
+  const prevTabIdRef = useRef<string | null>(null);
 
   const activeTabId = useStore((s) => s.activeTabId);
   const tab = useStore((s) => s.tabs.find((t) => t.id === s.activeTabId));
   const settings = useStore((s) => s.settings);
 
-  // Create the CodeMirror instance once.
   useEffect(() => {
     if (!hostRef.current) return;
     const store = useStore.getState();
     const initial = store.activeTab()?.content ?? "";
+    const showLines = store.settings.showLineNumbers;
 
     const view = new EditorView({
       parent: hostRef.current,
@@ -38,6 +41,9 @@ export function Editor() {
           EditorState.allowMultipleSelections.of(true),
           wrapCompartment.current.of(
             store.settings.wordWrap ? EditorView.lineWrapping : [],
+          ),
+          guttersCompartment.current.of(
+            showLines ? [lineNumbers(), highlightActiveLineGutter()] : [],
           ),
           keymap.of([
             ...defaultKeymap,
@@ -68,12 +74,10 @@ export function Editor() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Sync document when the active tab changes.
   useEffect(() => {
     const view = viewRef.current;
     if (!view) return;
 
-    // Save the outgoing tab's cursor / scroll position.
     const prevId = prevTabIdRef.current;
     if (prevId && prevId !== activeTabId) {
       const sel = view.state.selection.main;
@@ -110,7 +114,6 @@ export function Editor() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTabId]);
 
-  // Reconfigure word wrap.
   useEffect(() => {
     viewRef.current?.dispatch({
       effects: wrapCompartment.current.reconfigure(
@@ -119,17 +122,19 @@ export function Editor() {
     });
   }, [settings.wordWrap]);
 
+  useEffect(() => {
+    viewRef.current?.dispatch({
+      effects: guttersCompartment.current.reconfigure(
+        settings.showLineNumbers ? [lineNumbers(), highlightActiveLineGutter()] : [],
+      ),
+    });
+  }, [settings.showLineNumbers]);
+
   const fontSize = settings.fontSize * (settings.zoom / 100);
-  const deco: string[] = [];
-  if (settings.underline) deco.push("underline");
-  if (settings.strikethrough) deco.push("line-through");
 
   const styleVars = {
     "--ef-size": `${fontSize}px`,
     "--ef-family": settings.fontFamily,
-    "--ef-weight": settings.bold ? 700 : 400,
-    "--ef-style": settings.italic ? "italic" : "normal",
-    "--ef-deco": deco.length ? deco.join(" ") : "none",
   } as CSSProperties;
 
   return <div className="editor-wrap" ref={hostRef} style={styleVars} />;

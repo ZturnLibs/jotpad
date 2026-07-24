@@ -109,7 +109,7 @@ export function Settings() {
         <section>
           <h4>{t("settings.font")}</h4>
           <div className="field">
-            <label>{t("toolbar.font")}</label>
+            <label>{t("settings.font")}</label>
             <select
               value={settings.fontFamily}
               onChange={(e) => setSettings({ fontFamily: e.target.value })}
@@ -142,6 +142,11 @@ export function Settings() {
               on={settings.wordWrap}
               onChange={(v) => setSettings({ wordWrap: v })}
               label={t("settings.wordWrap")}
+            />
+            <Toggle
+              on={settings.showLineNumbers}
+              onChange={(v) => setSettings({ showLineNumbers: v })}
+              label={t("settings.lineNumbers")}
             />
             <Toggle
               on={settings.showStatusBar}

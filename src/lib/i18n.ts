@@ -19,6 +19,9 @@ const zhCN: Dict = {
   "file.newKey": "Ctrl+N",
   "file.newWindow": "新建窗口",
   "file.open": "打开…",
+  "file.recent": "最近打开的文件",
+  "file.recentEmpty": "（无）",
+  "file.clearRecent": "清除最近文件",
   "file.save": "保存",
   "file.saveAs": "另存为…",
   "file.pageSetup": "页面设置…",
@@ -56,6 +59,7 @@ const zhCN: Dict = {
   "view.zoomReset": "恢复默认大小",
   "view.statusBar": "状态栏",
   "view.wordWrap": "自动换行",
+  "view.lineNumbers": "行号",
   "view.theme": "主题",
   "view.themeLight": "浅色",
   "view.themeDark": "深色",
@@ -67,10 +71,6 @@ const zhCN: Dict = {
   // Toolbar
   "toolbar.font": "字体",
   "toolbar.fontSize": "字号",
-  "toolbar.bold": "加粗",
-  "toolbar.italic": "斜体",
-  "toolbar.underline": "下划线",
-  "toolbar.strikethrough": "删除线",
   "toolbar.wordWrap": "自动换行",
   "toolbar.zoomOut": "缩小",
   "toolbar.zoomIn": "放大",
@@ -116,6 +116,10 @@ const zhCN: Dict = {
   "dialog.fileNotFound": "找不到文件：{name}",
   "dialog.openError": "打开文件失败",
   "dialog.saveError": "保存文件失败",
+  "dialog.reloadTitle": "文件已更改",
+  "dialog.reloadMsg": "磁盘上的“{name}”已被其他程序修改。是否重新加载？",
+  "dialog.reload": "重新加载",
+  "dialog.reloadKeep": "保留当前内容",
 
   // Status bar
   "status.line": "行",
@@ -135,12 +139,13 @@ const zhCN: Dict = {
   "settings.behavior": "行为",
   "settings.showStatusBar": "显示状态栏",
   "settings.wordWrap": "自动换行",
+  "settings.lineNumbers": "显示行号",
   "settings.accent": "强调色",
 
   // Misc
   "misc.emptyHint": "新建一个标签页开始编写",
   "misc.about": "关于 Jotpad",
-  "misc.aboutText": "跨平台记事本，灵感来自 Windows 11 记事本",
+  "misc.aboutText": "一款跨平台记事本",
 };
 
 const en: Dict = {
@@ -155,6 +160,9 @@ const en: Dict = {
   "file.newKey": "Ctrl+N",
   "file.newWindow": "New Window",
   "file.open": "Open…",
+  "file.recent": "Recent Files",
+  "file.recentEmpty": "(Empty)",
+  "file.clearRecent": "Clear Recent Files",
   "file.save": "Save",
   "file.saveAs": "Save As…",
   "file.pageSetup": "Page Setup…",
@@ -190,6 +198,7 @@ const en: Dict = {
   "view.zoomReset": "Restore Default Zoom",
   "view.statusBar": "Status Bar",
   "view.wordWrap": "Word Wrap",
+  "view.lineNumbers": "Line Numbers",
   "view.theme": "Theme",
   "view.themeLight": "Light",
   "view.themeDark": "Dark",
@@ -200,10 +209,6 @@ const en: Dict = {
 
   "toolbar.font": "Font",
   "toolbar.fontSize": "Font Size",
-  "toolbar.bold": "Bold",
-  "toolbar.italic": "Italic",
-  "toolbar.underline": "Underline",
-  "toolbar.strikethrough": "Strikethrough",
   "toolbar.wordWrap": "Word Wrap",
   "toolbar.zoomOut": "Zoom Out",
   "toolbar.zoomIn": "Zoom In",
@@ -245,6 +250,10 @@ const en: Dict = {
   "dialog.fileNotFound": "File not found: {name}",
   "dialog.openError": "Failed to open file",
   "dialog.saveError": "Failed to save file",
+  "dialog.reloadTitle": "File Changed",
+  "dialog.reloadMsg": "“{name}” has been modified by another program. Reload it?",
+  "dialog.reload": "Reload",
+  "dialog.reloadKeep": "Keep Editing",
 
   "status.line": "Line",
   "status.col": "Col",
@@ -262,11 +271,12 @@ const en: Dict = {
   "settings.behavior": "Behavior",
   "settings.showStatusBar": "Show status bar",
   "settings.wordWrap": "Word wrap",
+  "settings.lineNumbers": "Show line numbers",
   "settings.accent": "Accent color",
 
   "misc.emptyHint": "Create a new tab to start writing",
   "misc.about": "About Jotpad",
-  "misc.aboutText": "A cross-platform notepad, inspired by Windows 11 Notepad",
+  "misc.aboutText": "A cross-platform notepad",
 };
 
 const DICTS: Record<Locale, Dict> = {

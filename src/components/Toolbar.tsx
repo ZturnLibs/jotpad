@@ -14,31 +14,6 @@ export function Toolbar() {
   const settings = useStore((s) => s.settings);
   const setSettings = useStore((s) => s.setSettings);
 
-  const styleBtn = (on: boolean, label: string, title: string, onClick: () => void) => (
-    <button
-      className={"tb-btn" + (on ? " active" : "")}
-      onClick={onClick}
-      title={title}
-      aria-label={title}
-      aria-pressed={on}
-    >
-      <span
-        style={{
-          fontWeight: 700,
-          fontStyle: label === "I" ? "italic" : undefined,
-          textDecoration:
-            label === "U"
-              ? "underline"
-              : label === "S"
-                ? "line-through"
-                : undefined,
-        }}
-      >
-        {label}
-      </span>
-    </button>
-  );
-
   const themeCycle: ThemeMode[] = ["light", "dark", "system"];
   const themeIcon = settings.theme === "light" ? "sun" : settings.theme === "dark" ? "moon" : "monitor";
 
@@ -81,23 +56,6 @@ export function Toolbar() {
         >
           <Icon name="chevronUp" size={12} />
         </button>
-      </div>
-
-      <div className="tb-sep" />
-
-      <div className="tb-group">
-        {styleBtn(settings.bold, "B", t("toolbar.bold"), () =>
-          setSettings({ bold: !settings.bold }),
-        )}
-        {styleBtn(settings.italic, "I", t("toolbar.italic"), () =>
-          setSettings({ italic: !settings.italic }),
-        )}
-        {styleBtn(settings.underline, "U", t("toolbar.underline"), () =>
-          setSettings({ underline: !settings.underline }),
-        )}
-        {styleBtn(settings.strikethrough, "S", t("toolbar.strikethrough"), () =>
-          setSettings({ strikethrough: !settings.strikethrough }),
-        )}
       </div>
 
       <div className="tb-sep" />

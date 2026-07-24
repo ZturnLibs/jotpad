@@ -46,6 +46,8 @@ export interface TabState {
   dirty: boolean;
   /** Last known on-disk size in bytes. */
   size: number;
+  /** Last known on-disk mtime (ms since epoch), or null for untitled. */
+  diskMtimeMs: number | null;
   /** Cursor selection, saved on blur / tab switch for restore. */
   selection: { from: number; to: number } | null;
   scrollTop: number;
@@ -56,13 +58,10 @@ export interface AppSettings {
   locale: Locale;
   fontFamily: string;
   fontSize: number; // px
-  bold: boolean;
-  italic: boolean;
-  underline: boolean;
-  strikethrough: boolean;
   wordWrap: boolean;
   zoom: number; // percent
   showStatusBar: boolean;
+  showLineNumbers: boolean;
   accent: string; // "system" or hex like "#0067C0"
 }
 
@@ -79,13 +78,10 @@ export const DEFAULT_SETTINGS: AppSettings = {
   locale: "zh-CN",
   fontFamily: "Cascadia Code, Consolas, Menlo, Monaco, monospace",
   fontSize: 14,
-  bold: false,
-  italic: false,
-  underline: false,
-  strikethrough: false,
   wordWrap: true,
   zoom: 100,
   showStatusBar: true,
+  showLineNumbers: false,
   accent: "system",
 };
 

@@ -53,6 +53,37 @@ export function ConfirmDialog() {
   );
 }
 
+/** Disk file changed externally — reload or keep editing. */
+export function ReloadDialog() {
+  const prompt = useStore((s) => s.reloadPrompt);
+  const resolve = useStore((s) => s.resolveReloadPrompt);
+  const t = useT();
+
+  if (!prompt) return null;
+
+  const name = basename(prompt.path);
+
+  return (
+    <div
+      className="overlay"
+      onMouseDown={(e) => e.target === e.currentTarget && resolve("keep")}
+    >
+      <div className="dialog">
+        <h3>{t("dialog.reloadTitle")}</h3>
+        <p>{t("dialog.reloadMsg", { name })}</p>
+        <div className="dialog-actions">
+          <button className="btn" onClick={() => void resolve("keep")}>
+            {t("dialog.reloadKeep")}
+          </button>
+          <button className="btn primary" onClick={() => void resolve("reload")}>
+            {t("dialog.reload")}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /** Go to line dialog. */
 export function GotoDialog() {
   const open = useStore((s) => s.gotoOpen);
