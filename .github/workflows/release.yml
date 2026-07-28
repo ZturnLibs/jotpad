@@ -63,10 +63,11 @@ jobs:
       - name: Run unit tests
         run: pnpm test
 
+      # 组织默认禁用 GITHUB_TOKEN 写权限，需配置仓库 Secret RELEASE_TOKEN（repo 权限）
       - name: Build and upload release
         uses: tauri-apps/tauri-action@v1
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         with:
           tagName: v__VERSION__
           releaseName: Jotpad v__VERSION__
