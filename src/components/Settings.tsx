@@ -81,6 +81,7 @@ export function Settings() {
   const [shellOpen, setShellOpen] = useState(false);
   const [shellBusy, setShellBusy] = useState(false);
   const [shellError, setShellError] = useState<string | null>(null);
+  const [shellPlatform, setShellPlatform] = useState<string>("");
 
   useEffect(() => {
     if (open) setTab("appearance");
@@ -95,9 +96,13 @@ export function Settings() {
         if (cancelled) return;
         setShellNew(status.newTextFile);
         setShellOpen(status.openWith);
+        setShellPlatform(status.platform);
         setShellError(null);
-      } catch {
-        if (!cancelled) setShellError(t("settings.shellError"));
+      } catch (e) {
+        if (!cancelled) {
+          const msg = typeof e === "string" ? e : e instanceof Error ? e.message : String(e ?? "");
+          setShellError(msg || t("settings.shellError"));
+        }
       }
     })();
     return () => {
@@ -105,14 +110,22 @@ export function Settings() {
     };
   }, [open, t]);
 
+  function shellPlatformHint(): string {
+    if (shellPlatform === "macos") return t("settings.shellHintMac");
+    if (shellPlatform === "windows") return t("settings.shellHintWindows");
+    if (shellPlatform === "linux") return t("settings.shellHintLinux");
+    return "";
+  }
+
   async function toggleShellNew(v: boolean) {
     setShellBusy(true);
     setShellError(null);
     try {
       await api.setShellNewTextFile(v);
       setShellNew(v);
-    } catch {
-      setShellError(t("settings.shellError"));
+    } catch (e) {
+      const msg = typeof e === "string" ? e : e instanceof Error ? e.message : String(e ?? "");
+      setShellError(msg || t("settings.shellError"));
     } finally {
       setShellBusy(false);
     }
@@ -124,8 +137,9 @@ export function Settings() {
     try {
       await api.setShellOpenWith(v);
       setShellOpen(v);
-    } catch {
-      setShellError(t("settings.shellError"));
+    } catch (e) {
+      const msg = typeof e === "string" ? e : e instanceof Error ? e.message : String(e ?? "");
+      setShellError(msg || t("settings.shellError"));
     } finally {
       setShellBusy(false);
     }
@@ -255,6 +269,9 @@ export function Settings() {
                 <div className="field" style={{ marginTop: 12 }}>
                   <label>{t("settings.system")}</label>
                   <p className="settings-hint muted">{t("settings.shellHint")}</p>
+                  {shellPlatformHint() && (
+                    <p className="settings-hint muted">{shellPlatformHint()}</p>
+                  )}
                   <div className="settings-toggles">
                     <Toggle
                       on={shellNew}

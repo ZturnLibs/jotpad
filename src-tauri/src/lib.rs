@@ -319,6 +319,9 @@ pub fn run() {
             if !launch.is_empty() {
                 shell_integration::enqueue_open_paths(app.handle(), launch);
             }
+
+            // Refresh shell integrations so context-menu commands keep a current exe path.
+            shell_integration::resync_if_enabled(app.handle());
             Ok(())
         })
         .build(tauri::generate_context!())

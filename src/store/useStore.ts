@@ -47,6 +47,8 @@ interface Store {
   menuOpen: MenuKind;
   confirm: ConfirmState | null;
   reloadPrompt: ReloadPrompt | null;
+  /** Window always-on-top (not persisted). */
+  alwaysOnTop: boolean;
 
   // Derived
   activeTab: () => TabState | undefined;
@@ -92,6 +94,7 @@ interface Store {
   setAboutOpen: (v: boolean) => void;
   setPageSetupOpen: (v: boolean) => void;
   setMenuOpen: (m: MenuKind) => void;
+  toggleAlwaysOnTop: () => Promise<void>;
 
   // Exit
   requestExit: () => Promise<void>;
@@ -169,6 +172,7 @@ export const useStore = create<Store>((set, get) => ({
   menuOpen: null,
   confirm: null,
   reloadPrompt: null,
+  alwaysOnTop: false,
 
   activeTab: () => {
     const { tabs, activeTabId } = get();
@@ -542,6 +546,16 @@ export const useStore = create<Store>((set, get) => ({
   setAboutOpen: (v) => set({ aboutOpen: v }),
   setPageSetupOpen: (v) => set({ pageSetupOpen: v }),
   setMenuOpen: (m) => set({ menuOpen: m }),
+
+  toggleAlwaysOnTop: async () => {
+    const next = !get().alwaysOnTop;
+    try {
+      await getCurrentWindow().setAlwaysOnTop(next);
+      set({ alwaysOnTop: next });
+    } catch (e) {
+      console.error("setAlwaysOnTop failed", e);
+    }
+  },
 
   requestExit: async () => {
     const dirtyIds = get()

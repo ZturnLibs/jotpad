@@ -214,6 +214,13 @@ export function getMenuModel(): MenuModel {
     },
     { sep: true },
     {
+      id: "alwaysOnTop",
+      label: t("view.alwaysOnTop"),
+      checked: s.alwaysOnTop,
+      shortcut: `${MOD}+Shift+T`,
+      accel: A("Shift+T"),
+    },
+    {
       id: "wordWrap",
       label: t("view.wordWrap"),
       checked: s.settings.wordWrap,
@@ -367,6 +374,9 @@ export function runMenuAction(id: string): void {
       break;
     case "zoomReset":
       s.setSettings({ zoom: 100 });
+      break;
+    case "alwaysOnTop":
+      void s.toggleAlwaysOnTop();
       break;
     case "wordWrap":
       s.setSettings({ wordWrap: !s.settings.wordWrap });

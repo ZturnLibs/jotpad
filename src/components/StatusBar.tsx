@@ -4,15 +4,26 @@ import { useT } from "@/lib/i18n";
 import { subscribeEditor, type EditorInfo } from "@/lib/editorRef";
 import { ENCODINGS, LINE_ENDINGS } from "@/types";
 
-const initial: EditorInfo = { line: 1, col: 1, selectedChars: 0, charCount: 0, lineCount: 0 };
+const initial: EditorInfo = {
+  line: 1,
+  col: 1,
+  selectedChars: 0,
+  selectedWords: 0,
+  selectedLines: 0,
+  charCount: 0,
+  wordCount: 0,
+  lineCount: 0,
+};
 
 export function StatusBar() {
   const show = useStore((s) => s.settings.showStatusBar);
   const settings = useStore((s) => s.settings);
+  const alwaysOnTop = useStore((s) => s.alwaysOnTop);
   const activeTab = useStore((s) => s.tabs.find((t) => t.id === s.activeTabId));
   const setSettings = useStore((s) => s.setSettings);
   const setEncoding = useStore((s) => s.setEncoding);
   const setLineEnding = useStore((s) => s.setLineEnding);
+  const toggleAlwaysOnTop = useStore((s) => s.toggleAlwaysOnTop);
   const t = useT();
   const [info, setInfo] = useState(initial);
 
@@ -20,8 +31,10 @@ export function StatusBar() {
 
   if (!show) return null;
 
-  const sel =
-    info.selectedChars > 0 ? ` · ${t("status.selected")} ${info.selectedChars}` : "";
+  const hasSel = info.selectedChars > 0;
+  const sel = hasSel
+    ? ` · ${t("status.selected")} ${info.selectedChars} ${t("status.chars")} · ${info.selectedWords} ${t("status.words")} · ${info.selectedLines} ${t("status.lines")}`
+    : "";
 
   const cycleEncoding = () => {
     const cur = activeTab?.encoding ?? "UTF-8";
@@ -40,10 +53,24 @@ export function StatusBar() {
         {t("status.line")} {info.line}, {t("status.col")} {info.col}
         {sel}
       </span>
-      <span className="sb-item">
+      <span
+        className="sb-item"
+        title={`${info.charCount} ${t("status.chars")} · ${info.wordCount} ${t("status.words")} · ${info.lineCount} ${t("status.lines")}`}
+      >
         {info.charCount} {t("status.chars")}
+        {" · "}
+        {info.wordCount} {t("status.words")}
+        {" · "}
+        {info.lineCount} {t("status.lines")}
       </span>
       <span className="sb-spacer" />
+      <span
+        className={"sb-item sb-click" + (alwaysOnTop ? " sb-on" : "")}
+        onClick={() => void toggleAlwaysOnTop()}
+        title={t("view.alwaysOnTop")}
+      >
+        {alwaysOnTop ? t("status.pinned") : t("status.pin")}
+      </span>
       <span
         className="sb-item sb-click"
         onClick={() => setSettings({ zoom: 100 })}

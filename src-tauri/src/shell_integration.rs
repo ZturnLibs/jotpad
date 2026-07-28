@@ -1,7 +1,7 @@
 //! System shell integration: Finder/Explorer context menus + file open handling.
 //!
-//! - 「新建文本文件」: Finder Quick Action / Explorer context menu / Nautilus script
-//! - 「使用 Jotpad 打开」: Open-with handler + context menu item
+//! - 「新建文本文件」: Finder Quick Action / Explorer context menu / Nautilus·Dolphin
+//! - 「使用 Jotpad 打开」: Open-with registration + context menu item (not forced default)
 
 use serde::Serialize;
 use std::fs;
@@ -12,7 +12,11 @@ use tauri::{AppHandle, Emitter, Manager};
 const BUNDLE_ID: &str = "com.jotpad.app";
 const NEW_SERVICE_NAME: &str = "Jotpad 新建文本文件.workflow";
 const OPEN_SERVICE_NAME: &str = "使用 Jotpad 打开.workflow";
+const NEW_MENU: &str = "Jotpad 新建文本文件";
+const OPEN_MENU: &str = "使用 Jotpad 打开";
 const MARKER_DIR: &str = "shell-integration";
+const MARKER_NEW: &str = "new-text-file";
+const MARKER_OPEN: &str = "open-with";
 
 /// Paths received before the frontend is ready (esp. macOS Opened).
 static PENDING_PATHS: Mutex<Vec<String>> = Mutex::new(Vec::new());
@@ -45,6 +49,12 @@ fn marker_path(app: &AppHandle, name: &str) -> Result<PathBuf, String> {
     Ok(dir.join(name))
 }
 
+fn has_marker(app: &AppHandle, name: &str) -> bool {
+    marker_path(app, name)
+        .map(|p| p.exists())
+        .unwrap_or(false)
+}
+
 fn set_marker(app: &AppHandle, name: &str, enabled: bool) -> Result<(), String> {
     let path = marker_path(app, name)?;
     if enabled {
@@ -52,6 +62,50 @@ fn set_marker(app: &AppHandle, name: &str, enabled: bool) -> Result<(), String> 
     } else {
         let _ = fs::remove_file(&path);
         Ok(())
+    }
+}
+
+/// Prefer Chinese UI labels when the OS locale looks Chinese.
+#[cfg(any(target_os = "windows", all(unix, not(target_os = "macos"))))]
+fn locale_zh() -> bool {
+    #[cfg(target_os = "windows")]
+    {
+        let hkcu = winreg::RegKey::predef(winreg::enums::HKEY_CURRENT_USER);
+        if let Ok(key) = hkcu.open_subkey(r"Control Panel\International") {
+            if let Ok(name) = key.get_value::<String, _>("LocaleName") {
+                return name.to_lowercase().starts_with("zh");
+            }
+        }
+        false
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        for var in ["LC_ALL", "LC_MESSAGES", "LANG"] {
+            if let Ok(v) = std::env::var(var) {
+                if v.to_lowercase().starts_with("zh") {
+                    return true;
+                }
+            }
+        }
+        false
+    }
+}
+
+#[cfg(any(target_os = "windows", all(unix, not(target_os = "macos"))))]
+fn label_new_text() -> &'static str {
+    if locale_zh() {
+        "Jotpad 新建文本文件"
+    } else {
+        "New Text File (Jotpad)"
+    }
+}
+
+#[cfg(any(target_os = "windows", all(unix, not(target_os = "macos"))))]
+fn label_open_with() -> &'static str {
+    if locale_zh() {
+        "使用 Jotpad 打开"
+    } else {
+        "Open with Jotpad"
     }
 }
 
@@ -130,11 +184,7 @@ pub fn create_new_text_file(dir: &str) -> Result<String, String> {
     if !dir.is_dir() {
         return Err(format!("not a directory: {}", dir.display()));
     }
-    let candidates = [
-        "未命名.txt",
-        "untitled.txt",
-        "New Text File.txt",
-    ];
+    let candidates = ["未命名.txt", "untitled.txt", "New Text File.txt"];
     for name in candidates {
         let path = dir.join(name);
         if !path.exists() {
@@ -150,6 +200,20 @@ pub fn create_new_text_file(dir: &str) -> Result<String, String> {
         }
     }
     Err("could not allocate file name".into())
+}
+
+/// Re-install enabled integrations so executable paths stay current after updates.
+pub fn resync_if_enabled(app: &AppHandle) {
+    if has_marker(app, MARKER_NEW) {
+        if let Err(e) = install_new_text_file(app) {
+            eprintln!("[shell] resync new-text-file failed: {e}");
+        }
+    }
+    if has_marker(app, MARKER_OPEN) {
+        if let Err(e) = install_open_with(app) {
+            eprintln!("[shell] resync open-with failed: {e}");
+        }
+    }
 }
 
 #[tauri::command]
@@ -176,7 +240,7 @@ pub fn set_shell_new_text_file(app: AppHandle, enabled: bool) -> Result<(), Stri
     } else {
         uninstall_new_text_file(&app)?;
     }
-    set_marker(&app, "new-text-file", enabled)?;
+    set_marker(&app, MARKER_NEW, enabled)?;
     Ok(())
 }
 
@@ -187,7 +251,7 @@ pub fn set_shell_open_with(app: AppHandle, enabled: bool) -> Result<(), String> 
     } else {
         uninstall_open_with(&app)?;
     }
-    set_marker(&app, "open-with", enabled)?;
+    set_marker(&app, MARKER_OPEN, enabled)?;
     Ok(())
 }
 
@@ -198,6 +262,7 @@ fn is_new_text_file_enabled(app: &AppHandle) -> bool {
         services_dir()
             .map(|d| d.join(NEW_SERVICE_NAME).exists())
             .unwrap_or(false)
+            && macos::is_service_context_menu_enabled(NEW_MENU)
     }
     #[cfg(target_os = "windows")]
     {
@@ -220,6 +285,7 @@ fn is_open_with_enabled(app: &AppHandle) -> bool {
         services_dir()
             .map(|d| d.join(OPEN_SERVICE_NAME).exists())
             .unwrap_or(false)
+            && macos::is_service_context_menu_enabled(OPEN_MENU)
     }
     #[cfg(target_os = "windows")]
     {
@@ -260,7 +326,7 @@ fn uninstall_new_text_file(app: &AppHandle) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
         let _ = app;
-        macos::uninstall_workflow(NEW_SERVICE_NAME)
+        macos::uninstall_workflow(NEW_SERVICE_NAME, NEW_MENU)
     }
     #[cfg(target_os = "windows")]
     {
@@ -283,8 +349,7 @@ fn install_open_with(app: &AppHandle) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
         let _ = app;
-        macos::install_open_with_workflow()?;
-        macos::set_default_text_handler(true)
+        macos::install_open_with_workflow()
     }
     #[cfg(target_os = "windows")]
     {
@@ -305,7 +370,7 @@ fn uninstall_open_with(app: &AppHandle) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
         let _ = app;
-        macos::uninstall_workflow(OPEN_SERVICE_NAME)
+        macos::uninstall_workflow(OPEN_SERVICE_NAME, OPEN_MENU)
     }
     #[cfg(target_os = "windows")]
     {
@@ -361,33 +426,53 @@ fi
 "#;
         write_workflow(
             NEW_SERVICE_NAME,
-            "新建文本文件",
-            &["public.folder", "public.directory"],
+            NEW_MENU,
+            "new-text-file",
+            &["public.folder"],
             script,
             "com.apple.Automator.fileSystemObject.folder",
+            "A1B2C3D4-1111-4EAE-8588-EFEC8A48B0D1",
+            "B2C3D4E5-2222-4A51-8CC1-477A68B23B21",
+            "C3D4E5F6-3333-4FE4-8F38-F3FA66EB5822",
         )?;
+        set_service_context_menu(NEW_MENU, true)?;
         refresh_services();
         Ok(())
     }
 
     pub fn install_open_with_workflow() -> Result<(), String> {
         let launch = app_launch_path();
-        let launch_q = shell_single_quote(&path_to_string(&launch));
-        let script = format!(
-            r#"app={launch_q}
+        let launch_s = path_to_string(&launch);
+        let is_app = launch.extension().and_then(|e| e.to_str()) == Some("app");
+        let script = if is_app {
+            format!(
+                r#"app={app}
 for item in "$@"; do
   [ -e "$item" ] || continue
-  if [ -d "$app" ] && [[ "$app" == *.app ]]; then
-    /usr/bin/open -a "$app" "$item"
-  else
-    "$app" "$item" &
-  fi
+  /usr/bin/open -b {bundle} "$item" 2>/dev/null || /usr/bin/open -a "$app" "$item"
 done
-"#
-        );
+"#,
+                app = shell_single_quote(&launch_s),
+                bundle = shell_single_quote(BUNDLE_ID),
+            )
+        } else {
+            format!(
+                r#"app={app}
+# Dev / unpackaged binary — open by path; full Open With needs an installed .app.
+/usr/bin/open -b {bundle} "$@" 2>/dev/null && exit 0
+for item in "$@"; do
+  [ -e "$item" ] || continue
+  "$app" "$item" &
+done
+"#,
+                app = shell_single_quote(&launch_s),
+                bundle = shell_single_quote(BUNDLE_ID),
+            )
+        };
         write_workflow(
             OPEN_SERVICE_NAME,
-            "使用 Jotpad 打开",
+            OPEN_MENU,
+            "open-with",
             &[
                 "public.plain-text",
                 "public.text",
@@ -396,52 +481,148 @@ done
             ],
             &script,
             "com.apple.Automator.fileSystemObject",
+            "D4E5F6A7-4444-4EAE-8588-EFEC8A48B0D2",
+            "E5F6A7B8-5555-4A51-8CC1-477A68B23B22",
+            "F6A7B8C9-6666-4FE4-8F38-F3FA66EB5823",
         )?;
-        // Register with Launch Services when we have a .app bundle.
-        if launch.extension().and_then(|e| e.to_str()) == Some("app") {
+        if is_app {
             let _ = Command::new("/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister")
-                .args(["-f", &path_to_string(&launch)])
+                .args(["-f", &launch_s])
                 .status();
         }
+        set_service_context_menu(OPEN_MENU, true)?;
         refresh_services();
         Ok(())
     }
 
-    pub fn uninstall_workflow(name: &str) -> Result<(), String> {
+    pub fn uninstall_workflow(name: &str, menu: &str) -> Result<(), String> {
         if let Ok(dir) = services_dir() {
             let path = dir.join(name);
             if path.exists() {
                 fs::remove_dir_all(&path).map_err(|e| e.to_string())?;
             }
         }
+        let _ = set_service_context_menu(menu, false);
         refresh_services();
         Ok(())
     }
 
-    pub fn set_default_text_handler(enable: bool) -> Result<(), String> {
-        if !enable {
-            // Leaving the previous default alone avoids clobbering the user's choice
-            // (e.g. VS Code / TextEdit) when the toggle is turned off.
-            return Ok(());
+    pub fn is_service_context_menu_enabled(menu: &str) -> bool {
+        let key = format!("(null) - {menu} - runWorkflowAsService");
+        let Ok(domain) = read_pbs_domain() else {
+            return false;
+        };
+        service_context_menu_enabled_in_domain(&domain, &key, menu)
+    }
+
+    fn set_service_context_menu(menu: &str, enabled: bool) -> Result<(), String> {
+        let key = format!("(null) - {menu} - runWorkflowAsService");
+        // `defaults write … -dict-add` mis-parses keys that start with `(null)`.
+        // Export → mutate → import keeps cfprefsd in sync.
+        let mut domain = read_pbs_domain().unwrap_or_else(|_| plist_dict_empty());
+        let dict = domain
+            .as_dictionary_mut()
+            .ok_or_else(|| "pbs domain is not a dictionary".to_string())?;
+        if !dict.contains_key("NSServicesStatus") {
+            dict.insert("NSServicesStatus".into(), plist_dict_empty());
         }
-        let handler = BUNDLE_ID;
-        // JXA → CoreServices LSSetDefaultRoleHandlerForContentType
-        let types = ["public.plain-text", "public.text", "public.utf8-plain-text"];
-        for ty in types {
-            let script = format!(
-                r#"ObjC.import('CoreServices');
-ObjC.import('CoreFoundation');
-var status = $.LSSetDefaultRoleHandlerForContentType('{ty}', $.kLSRolesAll, '{handler}');
-if (status !== 0) {{ throw new Error('LSSetDefaultRoleHandlerForContentType failed: ' + status); }}"#
-            );
-            let status = Command::new("/usr/bin/osascript")
-                .args(["-l", "JavaScript", "-e", &script])
-                .status()
-                .map_err(|e| e.to_string())?;
-            if !status.success() {
-                // Non-fatal in dev (unsigned / no bundle registration yet).
-                eprintln!("[shell] set default handler for {ty} failed (status {status})");
+        let status_dict = dict
+            .get_mut("NSServicesStatus")
+            .and_then(|v| v.as_dictionary_mut())
+            .ok_or_else(|| "NSServicesStatus is not a dictionary".to_string())?;
+        if enabled {
+            status_dict.insert(key, presentation_modes_value());
+        } else {
+            status_dict.remove(&key);
+            let stale: Vec<String> = status_dict
+                .keys()
+                .filter(|k| k.contains(menu))
+                .cloned()
+                .collect();
+            for k in stale {
+                status_dict.remove(&k);
             }
+        }
+        write_pbs_domain(&domain)?;
+        Ok(())
+    }
+
+    fn presentation_modes_value() -> plist::Value {
+        let mut modes = plist::Dictionary::new();
+        modes.insert("ContextMenu".into(), plist::Value::Integer(1.into()));
+        modes.insert("ServicesMenu".into(), plist::Value::Integer(1.into()));
+        modes.insert("FinderPreview".into(), plist::Value::Integer(1.into()));
+        modes.insert("TouchBar".into(), plist::Value::Integer(1.into()));
+        let mut wrap = plist::Dictionary::new();
+        wrap.insert("presentation_modes".into(), plist::Value::Dictionary(modes));
+        plist::Value::Dictionary(wrap)
+    }
+
+    fn plist_dict_empty() -> plist::Value {
+        plist::Value::Dictionary(plist::Dictionary::new())
+    }
+
+    fn service_context_menu_enabled_in_domain(
+        domain: &plist::Value,
+        key: &str,
+        menu: &str,
+    ) -> bool {
+        let Some(status) = domain
+            .as_dictionary()
+            .and_then(|d| d.get("NSServicesStatus"))
+            .and_then(|v| v.as_dictionary())
+        else {
+            return false;
+        };
+        let entry = status.get(key).or_else(|| {
+            status
+                .iter()
+                .find(|(k, _)| k.contains(menu))
+                .map(|(_, v)| v)
+        });
+        let Some(entry) = entry.and_then(|v| v.as_dictionary()) else {
+            return false;
+        };
+        entry
+            .get("presentation_modes")
+            .and_then(|v| v.as_dictionary())
+            .and_then(|m| m.get("ContextMenu"))
+            .and_then(|v| v.as_signed_integer())
+            .map(|n| n != 0)
+            .unwrap_or(false)
+    }
+
+    fn read_pbs_domain() -> Result<plist::Value, String> {
+        let output = Command::new("/usr/bin/defaults")
+            .args(["export", "pbs", "-"])
+            .output()
+            .map_err(|e| e.to_string())?;
+        if !output.status.success() || output.stdout.is_empty() {
+            return Ok(plist_dict_empty());
+        }
+        plist::from_bytes(&output.stdout).map_err(|e| e.to_string())
+    }
+
+    fn write_pbs_domain(domain: &plist::Value) -> Result<(), String> {
+        let mut xml = Vec::new();
+        plist::to_writer_xml(&mut xml, domain).map_err(|e| e.to_string())?;
+        let mut child = Command::new("/usr/bin/defaults")
+            .args(["import", "pbs", "-"])
+            .stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::piped())
+            .spawn()
+            .map_err(|e| e.to_string())?;
+        use std::io::Write;
+        if let Some(stdin) = child.stdin.as_mut() {
+            stdin.write_all(&xml).map_err(|e| e.to_string())?;
+        }
+        let output = child.wait_with_output().map_err(|e| e.to_string())?;
+        if !output.status.success() {
+            return Err(format!(
+                "defaults import pbs failed: {}",
+                String::from_utf8_lossy(&output.stderr)
+            ));
         }
         Ok(())
     }
@@ -449,9 +630,13 @@ if (status !== 0) {{ throw new Error('LSSetDefaultRoleHandlerForContentType fail
     fn write_workflow(
         name: &str,
         menu: &str,
+        service_id: &str,
         file_types: &[&str],
         command: &str,
         input_type: &str,
+        action_uuid: &str,
+        input_uuid: &str,
+        output_uuid: &str,
     ) -> Result<(), String> {
         let dir = services_dir()?.join(name).join("Contents");
         fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
@@ -466,10 +651,22 @@ if (status !== 0) {{ throw new Error('LSSetDefaultRoleHandlerForContentType fail
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>English</string>
+	<key>CFBundleExecutable</key>
+	<string></string>
 	<key>CFBundleIdentifier</key>
-	<string>{bundle}.service.{menu_id}</string>
+	<string>{bundle}.service.{service_id}</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
 	<key>CFBundleName</key>
 	<string>{menu}</string>
+	<key>CFBundlePackageType</key>
+	<string>BNDL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>1.0</string>
+	<key>CFBundleVersion</key>
+	<string>1</string>
 	<key>NSServices</key>
 	<array>
 		<dict>
@@ -498,7 +695,6 @@ if (status !== 0) {{ throw new Error('LSSetDefaultRoleHandlerForContentType fail
 </plist>
 "#,
             bundle = BUNDLE_ID,
-            menu_id = menu.replace(' ', "-"),
         );
         fs::write(dir.join("Info.plist"), info).map_err(|e| e.to_string())?;
 
@@ -536,6 +732,32 @@ if (status !== 0) {{ throw new Error('LSSetDefaultRoleHandlerForContentType fail
 				</dict>
 				<key>AMActionVersion</key>
 				<string>2.0.3</string>
+				<key>AMApplication</key>
+				<array>
+					<string>Automator</string>
+				</array>
+				<key>AMParameterProperties</key>
+				<dict>
+					<key>COMMAND_STRING</key>
+					<dict/>
+					<key>CheckedForUserDefaultShell</key>
+					<dict/>
+					<key>inputMethod</key>
+					<dict/>
+					<key>shell</key>
+					<dict/>
+					<key>source</key>
+					<dict/>
+				</dict>
+				<key>AMProvides</key>
+				<dict>
+					<key>Container</key>
+					<string>List</string>
+					<key>Types</key>
+					<array>
+						<string>com.apple.cocoa.string</string>
+					</array>
+				</dict>
 				<key>ActionBundlePath</key>
 				<string>/System/Library/Automator/Run Shell Script.action</string>
 				<key>ActionName</key>
@@ -557,10 +779,31 @@ if (status !== 0) {{ throw new Error('LSSetDefaultRoleHandlerForContentType fail
 				<string>com.apple.RunShellScript</string>
 				<key>CFBundleVersion</key>
 				<string>2.0.3</string>
+				<key>CanShowSelectedItemsWhenRun</key>
+				<false/>
+				<key>CanShowWhenRun</key>
+				<true/>
+				<key>Category</key>
+				<array>
+					<string>AMCategoryUtilities</string>
+				</array>
 				<key>Class Name</key>
 				<string>RunShellScriptAction</string>
+				<key>InputUUID</key>
+				<string>{input_uuid}</string>
+				<key>Keywords</key>
+				<array>
+					<string>Shell</string>
+					<string>Script</string>
+				</array>
+				<key>OutputUUID</key>
+				<string>{output_uuid}</string>
 				<key>UUID</key>
-				<string>9918289D-6238-44AE-8588-EFEC8A48B0D0</string>
+				<string>{action_uuid}</string>
+				<key>UnlocalizedApplications</key>
+				<array>
+					<string>Automator</string>
+				</array>
 			</dict>
 		</dict>
 	</array>
@@ -568,16 +811,28 @@ if (status !== 0) {{ throw new Error('LSSetDefaultRoleHandlerForContentType fail
 	<dict/>
 	<key>workflowMetaData</key>
 	<dict>
+		<key>applicationBundleID</key>
+		<string>com.apple.finder</string>
+		<key>applicationPath</key>
+		<string>/System/Library/CoreServices/Finder.app</string>
+		<key>presentationMode</key>
+		<integer>15</integer>
+		<key>processesInput</key>
+		<false/>
 		<key>serviceApplicationBundleID</key>
 		<string>com.apple.finder</string>
+		<key>serviceApplicationPath</key>
+		<string>/System/Library/CoreServices/Finder.app</string>
 		<key>serviceInputTypeIdentifier</key>
 		<string>{input_type}</string>
 		<key>serviceOutputTypeIdentifier</key>
 		<string>com.apple.Automator.nothing</string>
 		<key>serviceProcessesInput</key>
-		<true/>
+		<false/>
 		<key>systemImageName</key>
 		<string>NSTouchBarAdd</string>
+		<key>useAutomaticInputType</key>
+		<false/>
 		<key>workflowTypeIdentifier</key>
 		<string>com.apple.Automator.servicesMenu</string>
 	</dict>
@@ -593,8 +848,6 @@ if (status !== 0) {{ throw new Error('LSSetDefaultRoleHandlerForContentType fail
         let _ = Command::new("/System/Library/CoreServices/pbs")
             .arg("-flush")
             .status();
-        // Soft refresh; ignore failures on newer macOS where pbs may be gone.
-        let _ = Command::new("killall").args(["-KILL", "pbs"]).status();
     }
 
     fn shell_single_quote(s: &str) -> String {
@@ -628,10 +881,11 @@ mod windows {
     pub fn install_new_text(app: &AppHandle) -> Result<(), String> {
         let _ = app;
         let exe = path_to_string(&app_launch_path());
+        let label = label_new_text();
         let hkcu = RegKey::predef(HKEY_CURRENT_USER);
         for key_path in [NEW_KEY, NEW_DIR_KEY] {
             let (key, _) = hkcu.create_subkey(key_path).map_err(|e| e.to_string())?;
-            key.set_value("", &"新建文本文件").map_err(|e| e.to_string())?;
+            key.set_value("", &label).map_err(|e| e.to_string())?;
             key.set_value("Icon", &format!("\"{exe}\",0"))
                 .map_err(|e| e.to_string())?;
             let (cmd, _) = key.create_subkey("command").map_err(|e| e.to_string())?;
@@ -655,6 +909,7 @@ mod windows {
     pub fn install_open_with(app: &AppHandle) -> Result<(), String> {
         let _ = app;
         let exe = path_to_string(&app_launch_path());
+        let label = label_open_with();
         let hkcu = RegKey::predef(HKEY_CURRENT_USER);
 
         let (prog, _) = hkcu.create_subkey(PROGID).map_err(|e| e.to_string())?;
@@ -666,13 +921,14 @@ mod windows {
         cmd.set_value("", &format!("\"{exe}\" \"%1\""))
             .map_err(|e| e.to_string())?;
 
-        let (ow, _) = hkcu.create_subkey(PROGID_OPENWITH).map_err(|e| e.to_string())?;
+        let (ow, _) = hkcu
+            .create_subkey(PROGID_OPENWITH)
+            .map_err(|e| e.to_string())?;
         ow.set_value("Jotpad.txt", &"").map_err(|e| e.to_string())?;
 
         for key_path in [OPEN_KEY, OPEN_TXT] {
             let (key, _) = hkcu.create_subkey(key_path).map_err(|e| e.to_string())?;
-            key.set_value("", &"使用 Jotpad 打开")
-                .map_err(|e| e.to_string())?;
+            key.set_value("", &label).map_err(|e| e.to_string())?;
             key.set_value("Icon", &format!("\"{exe}\",0"))
                 .map_err(|e| e.to_string())?;
             let (cmd, _) = key.create_subkey("command").map_err(|e| e.to_string())?;
@@ -708,14 +964,30 @@ mod linux {
         Ok(home()?.join(".local/share/nautilus/scripts"))
     }
 
+    fn dolphin_servicemenus() -> Result<PathBuf, String> {
+        Ok(home()?.join(".local/share/kio/servicemenus"))
+    }
+
     fn applications_dir() -> Result<PathBuf, String> {
         Ok(home()?.join(".local/share/applications"))
     }
 
+    fn new_script_name() -> &'static str {
+        if locale_zh() {
+            "Jotpad-新建文本文件"
+        } else {
+            "Jotpad-New-Text-File"
+        }
+    }
+
     pub fn new_text_installed() -> bool {
-        nautilus_scripts()
-            .map(|d| d.join("新建文本文件").exists())
-            .unwrap_or(false)
+        let nautilus = nautilus_scripts()
+            .map(|d| d.join(new_script_name()).exists() || d.join("新建文本文件").exists())
+            .unwrap_or(false);
+        let dolphin = dolphin_servicemenus()
+            .map(|d| d.join("jotpad-new-text.desktop").exists())
+            .unwrap_or(false);
+        nautilus || dolphin
     }
 
     pub fn open_with_installed() -> bool {
@@ -727,26 +999,70 @@ mod linux {
     pub fn install_new_text(app: &AppHandle) -> Result<(), String> {
         let _ = app;
         let exe = path_to_string(&app_launch_path());
+        let label = label_new_text();
+
+        // Nautilus scripts (appear under Scripts submenu).
         let dir = nautilus_scripts()?;
         fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+        // Remove legacy name if present.
+        let _ = fs::remove_file(dir.join("新建文本文件"));
         let script = format!(
-            "#!/bin/bash\nDIR=\"${{1:-$(pwd)}}\"\nexec \"{exe}\" --new-in \"$DIR\"\n"
+            r#"#!/bin/bash
+set -euo pipefail
+DIR=""
+if [ -n "${{NAUTILUS_SCRIPT_SELECTED_FILE_PATHS:-}}" ]; then
+  while IFS= read -r line; do
+    [ -z "$line" ] && continue
+    if [ -d "$line" ]; then DIR="$line"; break; fi
+    DIR="$(dirname "$line")"
+    break
+  done <<< "$NAUTILUS_SCRIPT_SELECTED_FILE_PATHS"
+fi
+if [ -z "$DIR" ]; then
+  DIR="${{NAUTILUS_SCRIPT_CURRENT_URI:-}}"
+  DIR="${{DIR#file://}}"
+fi
+if [ -z "$DIR" ] || [ ! -d "$DIR" ]; then
+  DIR="$(pwd)"
+fi
+exec "{exe}" --new-in "$DIR"
+"#
         );
-        let path = dir.join("新建文本文件");
+        let path = dir.join(new_script_name());
         fs::write(&path, script).map_err(|e| e.to_string())?;
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            let mut perms = fs::metadata(&path).map_err(|e| e.to_string())?.permissions();
-            perms.set_mode(0o755);
-            fs::set_permissions(&path, perms).map_err(|e| e.to_string())?;
-        }
+        set_executable(&path)?;
+
+        // Dolphin service menu.
+        let ddir = dolphin_servicemenus()?;
+        fs::create_dir_all(&ddir).map_err(|e| e.to_string())?;
+        let desktop = format!(
+            r#"[Desktop Entry]
+Type=Service
+ServiceTypes=inode/directory
+Actions=newText
+X-KDE-Priority=TopLevel
+
+[Desktop Action newText]
+Name={label}
+Name[zh_CN]={zh}
+Icon=text-plain
+Exec="{exe}" --new-in %f
+"#,
+            zh = "Jotpad 新建文本文件",
+        );
+        fs::write(ddir.join("jotpad-new-text.desktop"), desktop).map_err(|e| e.to_string())?;
         Ok(())
     }
 
     pub fn uninstall_new_text() -> Result<(), String> {
         if let Ok(dir) = nautilus_scripts() {
+            let _ = fs::remove_file(dir.join(new_script_name()));
             let _ = fs::remove_file(dir.join("新建文本文件"));
+            let _ = fs::remove_file(dir.join("Jotpad-New-Text-File"));
+            let _ = fs::remove_file(dir.join("Jotpad-新建文本文件"));
+        }
+        if let Ok(dir) = dolphin_servicemenus() {
+            let _ = fs::remove_file(dir.join("jotpad-new-text.desktop"));
         }
         Ok(())
     }
@@ -754,18 +1070,49 @@ mod linux {
     pub fn install_open_with(app: &AppHandle) -> Result<(), String> {
         let _ = app;
         let exe = path_to_string(&app_launch_path());
+        let label = label_open_with();
         let dir = applications_dir()?;
         fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
         let desktop = format!(
-            "[Desktop Entry]\nType=Application\nName=Jotpad\nComment=Open text files with Jotpad\nExec=\"{exe}\" %F\nIcon=jotpad\nMimeType=text/plain;text/markdown;text/x-log;\nNoDisplay=false\nStartupNotify=true\n"
+            r#"[Desktop Entry]
+Type=Application
+Name=Jotpad
+Name[zh_CN]=Jotpad
+Comment=Open text files with Jotpad
+Comment[zh_CN]={label}
+Exec="{exe}" %F
+Icon=jotpad
+MimeType=text/plain;text/markdown;text/x-log;text/csv;application/json;application/xml;application/x-yaml;text/x-toml;
+NoDisplay=false
+StartupNotify=true
+Categories=Utility;TextEditor;
+"#
         );
         fs::write(dir.join("jotpad-open-text.desktop"), desktop).map_err(|e| e.to_string())?;
+
+        // Dolphin / file-manager "Open with" style action for text files.
+        let ddir = dolphin_servicemenus()?;
+        fs::create_dir_all(&ddir).map_err(|e| e.to_string())?;
+        let svc = format!(
+            r#"[Desktop Entry]
+Type=Service
+ServiceTypes=text/plain,text/markdown,text/x-log
+Actions=openJotpad
+X-KDE-Priority=TopLevel
+
+[Desktop Action openJotpad]
+Name={label}
+Name[zh_CN]=使用 Jotpad 打开
+Icon=jotpad
+Exec="{exe}" %f
+"#
+        );
+        fs::write(ddir.join("jotpad-open-text.desktop"), svc).map_err(|e| e.to_string())?;
+
         let _ = std::process::Command::new("update-desktop-database")
             .arg(&dir)
             .status();
-        let _ = std::process::Command::new("xdg-mime")
-            .args(["default", "jotpad-open-text.desktop", "text/plain"])
-            .status();
+        // Register as an available handler only — do not change the user default.
         Ok(())
     }
 
@@ -776,6 +1123,44 @@ mod linux {
                 .arg(&dir)
                 .status();
         }
+        if let Ok(dir) = dolphin_servicemenus() {
+            let _ = fs::remove_file(dir.join("jotpad-open-text.desktop"));
+        }
         Ok(())
+    }
+
+    fn set_executable(path: &Path) -> Result<(), String> {
+        use std::os::unix::fs::PermissionsExt;
+        let mut perms = fs::metadata(path).map_err(|e| e.to_string())?.permissions();
+        perms.set_mode(0o755);
+        fs::set_permissions(path, perms).map_err(|e| e.to_string())
+    }
+}
+
+#[cfg(all(test, target_os = "macos"))]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn macos_install_enables_context_menu() {
+        macos::install_new_text_workflow().expect("install new");
+        macos::install_open_with_workflow().expect("install open");
+
+        let services = services_dir().unwrap();
+        assert!(services.join(NEW_SERVICE_NAME).exists());
+        assert!(services.join(OPEN_SERVICE_NAME).exists());
+        assert!(
+            macos::is_service_context_menu_enabled(NEW_MENU),
+            "new-text ContextMenu should be enabled in NSServicesStatus"
+        );
+        assert!(
+            macos::is_service_context_menu_enabled(OPEN_MENU),
+            "open-with ContextMenu should be enabled in NSServicesStatus"
+        );
+
+        macos::uninstall_workflow(NEW_SERVICE_NAME, NEW_MENU).expect("uninstall new");
+        macos::uninstall_workflow(OPEN_SERVICE_NAME, OPEN_MENU).expect("uninstall open");
+        assert!(!macos::is_service_context_menu_enabled(NEW_MENU));
+        assert!(!macos::is_service_context_menu_enabled(OPEN_MENU));
     }
 }

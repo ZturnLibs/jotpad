@@ -618,6 +618,10 @@ textarea {
 .statusbar .sb-click:hover {
   background: var(--bg-hover);
 }
+.statusbar .sb-on {
+  color: var(--accent);
+  font-weight: 600;
+}
 
 /* ---------- Modal / Dialog overlay ---------- */
 .overlay {

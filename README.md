@@ -67,6 +67,7 @@ pnpm tauri build --debug --no-bundle
 | 转到行 | `Ctrl+G` | `Cmd+G` |
 | 撤销 / 重做 | `Ctrl+Z` / `Ctrl+Y` | `Cmd+Z` / `Cmd+Shift+Z` |
 | 全选 | `Ctrl+A` | `Cmd+A` |
+| 置顶 | `Ctrl+Shift+T` | `Cmd+Shift+T` |
 | 插入时间/日期 | `F5` | `F5` |
 | 放大 / 缩小 / 重置缩放 | `Ctrl+=` / `Ctrl+-` / `Ctrl+0` | `Cmd+=` / `Cmd+-` / `Cmd+0` |
 | 打印 | `Ctrl+P` | `Cmd+P` |

@@ -38,6 +38,7 @@ export function App() {
   const activeTabId = useStore((s) => s.activeTabId);
   const tabsLen = useStore((s) => s.tabs.length);
   const recentLen = useStore((s) => s.recentFiles.length);
+  const alwaysOnTop = useStore((s) => s.alwaysOnTop);
   const activeTab = useStore((s) => s.tabs.find((t) => t.id === s.activeTabId));
   const t = useT();
 
@@ -64,7 +65,7 @@ export function App() {
     if (!ready) return;
     void startNativeMenuListener();
     applyNativeMenuDebounced();
-  }, [ready, settings, activeTabId, tabsLen, recentLen]);
+  }, [ready, settings, activeTabId, tabsLen, recentLen, alwaysOnTop]);
 
   // Apply theme; react to system changes when in "system" mode.
   useEffect(() => {
@@ -202,6 +203,11 @@ export function App() {
       if (mod && k === ",") {
         eat();
         s.setSettingsOpen(true);
+        return;
+      }
+      if (mod && e.shiftKey && k === "t") {
+        eat();
+        void s.toggleAlwaysOnTop();
         return;
       }
       if (e.key === "F5") {

@@ -1851,6 +1851,7 @@ version = "0.1.0"
 dependencies = [
  "arboard",
  "encoding_rs",
+ "plist",
  "serde",
  "serde_json",
  "tauri",
