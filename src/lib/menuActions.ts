@@ -58,11 +58,6 @@ export interface MenuModel {
   window: MenuItemModel[];
 }
 
-const isMac = platform() === "macos";
-
-/** accelerator helper */
-const A = (k: string) => `CmdOrCtrl+${k}`;
-
 /** Open a new independent application window. */
 async function createNewWindow(): Promise<void> {
   try {
@@ -151,21 +146,12 @@ export function getMenuModel(): MenuModel {
           { id: "clearSessions", label: t("file.clearSessions") },
         ];
 
+  // Shortcut labels / accelerators come from `@/lib/shortcuts` via `sc(id)`.
   const file: MenuItemModel[] = [
-    { id: "new", label: t("file.new"), shortcut: `${MOD}+N`, accel: A("N") },
-    {
-      id: "newWindow",
-      label: t("file.newWindow"),
-      shortcut: `${MOD}+Shift+N`,
-      accel: A("Shift+N"),
-    },
-    { id: "open", label: t("file.open"), shortcut: `${MOD}+O`, accel: A("O") },
-    {
-      id: "quickOpen",
-      label: t("file.quickOpen"),
-      shortcut: `${MOD}+P`,
-      accel: A("P"),
-    },
+    { id: "new", label: t("file.new"), ...sc("new") },
+    { id: "newWindow", label: t("file.newWindow"), ...sc("newWindow") },
+    { id: "open", label: t("file.open"), ...sc("open") },
+    { id: "quickOpen", label: t("file.quickOpen"), ...sc("quickOpen") },
     {
       id: "recent",
       label: t("file.recent"),
@@ -179,61 +165,41 @@ export function getMenuModel(): MenuModel {
       submenu: sessionItems,
     },
     { sep: true },
-    { id: "save", label: t("file.save"), shortcut: `${MOD}+S`, accel: A("S") },
-    {
-      id: "saveAs",
-      label: t("file.saveAs"),
-      shortcut: `${MOD}+Shift+S`,
-      accel: A("Shift+S"),
-    },
+    { id: "save", label: t("file.save"), ...sc("save") },
+    { id: "saveAs", label: t("file.saveAs"), ...sc("saveAs") },
     { sep: true },
     { id: "pageSetup", label: t("file.pageSetup") },
     { id: "print", label: t("file.print") },
     { sep: true },
     { id: "about", label: t("misc.about") },
-    { id: "exit", label: t("file.exit"), accel: A("Q") },
+    { id: "exit", label: t("file.exit"), ...sc("exit") },
   ];
 
   const edit: MenuItemModel[] = [
-    { id: "undo", label: t("edit.undo"), shortcut: `${MOD}+Z`, accel: A("Z") },
-    {
-      id: "redo",
-      label: t("edit.redo"),
-      shortcut: isMac ? `${MOD}+Shift+Z` : `${MOD}+Y`,
-      accel: isMac ? A("Shift+Z") : A("Y"),
-    },
+    { id: "undo", label: t("edit.undo"), ...sc("undo") },
+    { id: "redo", label: t("edit.redo"), ...sc("redo") },
     { sep: true },
     // Native predefined items: OS owns accelerators + clipboard.
-    { id: "cut", predefined: "cut", label: t("edit.cut"), shortcut: `${MOD}+X` },
-    { id: "copy", predefined: "copy", label: t("edit.copy"), shortcut: `${MOD}+C` },
-    { id: "paste", predefined: "paste", label: t("edit.paste"), shortcut: `${MOD}+V` },
+    { id: "cut", predefined: "cut", label: t("edit.cut"), ...sc("cut") },
+    { id: "copy", predefined: "copy", label: t("edit.copy"), ...sc("copy") },
+    { id: "paste", predefined: "paste", label: t("edit.paste"), ...sc("paste") },
     // No accelerator — Delete must reach the editor's native keymap.
-    { id: "delete", label: t("edit.delete"), shortcut: "Del" },
+    { id: "delete", label: t("edit.delete"), ...sc("delete") },
     { sep: true },
-    { id: "find", label: t("edit.find"), shortcut: `${MOD}+F`, accel: A("F") },
-    { id: "findNext", label: t("edit.findNext"), shortcut: "F3", accel: "F3" },
-    { id: "findPrev", label: t("edit.findPrev"), shortcut: "Shift+F3", accel: "Shift+F3" },
-    {
-      id: "replace",
-      label: t("edit.replace"),
-      shortcut: isMac ? `${MOD}+Option+F` : `${MOD}+H`,
-      accel: isMac ? A("Alt+F") : A("H"),
-    },
-    { id: "goto", label: t("edit.goto"), shortcut: `${MOD}+G`, accel: A("G") },
-    {
-      id: "voice",
-      label: t("edit.voice"),
-      shortcut: `${MOD}+Shift+R`,
-      accel: A("Shift+R"),
-    },
+    { id: "find", label: t("edit.find"), ...sc("find") },
+    { id: "findNext", label: t("edit.findNext"), ...sc("findNext") },
+    { id: "findPrev", label: t("edit.findPrev"), ...sc("findPrev") },
+    { id: "replace", label: t("edit.replace"), ...sc("replace") },
+    { id: "goto", label: t("edit.goto"), ...sc("goto") },
+    { id: "voice", label: t("edit.voice"), ...sc("voice") },
     { sep: true },
     {
       id: "selectAll",
       predefined: "selectAll",
       label: t("edit.selectAll"),
-      shortcut: `${MOD}+A`,
+      ...sc("selectAll"),
     },
-    { id: "timeDate", label: t("edit.timeDate"), shortcut: "F5", accel: "F5" },
+    { id: "timeDate", label: t("edit.timeDate"), ...sc("timeDate") },
   ];
 
   const view: MenuItemModel[] = [
@@ -241,10 +207,10 @@ export function getMenuModel(): MenuModel {
       id: "zoom",
       label: t("view.zoom"),
       submenu: [
-        { id: "zoomIn", label: t("view.zoomIn"), shortcut: `${MOD}+Plus`, accel: A("=") },
-        { id: "zoomOut", label: t("view.zoomOut"), shortcut: `${MOD}+-`, accel: A("-") },
+        { id: "zoomIn", label: t("view.zoomIn"), ...sc("zoomIn") },
+        { id: "zoomOut", label: t("view.zoomOut"), ...sc("zoomOut") },
         { sep: true },
-        { id: "zoomReset", label: t("view.zoomReset"), shortcut: `${MOD}+0`, accel: A("0") },
+        { id: "zoomReset", label: t("view.zoomReset"), ...sc("zoomReset") },
       ],
     },
     { sep: true },
@@ -306,28 +272,19 @@ export function getMenuModel(): MenuModel {
       })),
     },
     { sep: true },
-    { id: "settings", label: t("toolbar.settings"), shortcut: `${MOD}+,`, accel: A(",") },
+    { id: "settings", label: t("toolbar.settings"), ...sc("settings") },
   ];
 
   // Window — document/window chrome (TextEdit / browsers / VS Code pattern).
   const windowMenu: MenuItemModel[] = [
-    {
-      id: "nextTab",
-      label: t("window.nextTab"),
-      shortcut: isMac ? `${MOD}+Option+→` : "Ctrl+Tab",
-    },
-    {
-      id: "prevTab",
-      label: t("window.prevTab"),
-      shortcut: isMac ? `${MOD}+Option+←` : "Ctrl+Shift+Tab",
-    },
+    { id: "nextTab", label: t("window.nextTab"), ...sc("nextTab") },
+    { id: "prevTab", label: t("window.prevTab"), ...sc("prevTab") },
     { sep: true },
     {
       id: "alwaysOnTop",
       label: t("window.alwaysOnTop"),
       checked: s.alwaysOnTop,
-      shortcut: `${MOD}+Shift+T`,
-      accel: A("Shift+T"),
+      ...sc("alwaysOnTop"),
     },
   ];
 

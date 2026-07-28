@@ -4,10 +4,10 @@ import { listen } from "@tauri-apps/api/event";
 import { useStore } from "@/store/useStore";
 import { useT } from "@/lib/i18n";
 import { basename, getSystemAccent, takePendingOpenPaths } from "@/lib/backend";
-import { clamp, darken, lighten, platform, rgbToHex } from "@/lib/utils";
+import { darken, lighten, platform, rgbToHex } from "@/lib/utils";
 import { getEditorView } from "@/lib/editorRef";
-import { insertAtCursor, timeDateString } from "@/lib/edit";
 import { runMenuAction } from "@/lib/menuActions";
+import { matchShortcut } from "@/lib/shortcuts";
 import { applyNativeMenuDebounced, startNativeMenuListener } from "@/lib/platformMenu";
 import { TabBar } from "@/components/TabBar";
 import { Toolbar } from "@/components/Toolbar";
@@ -145,186 +145,74 @@ export function App() {
     };
   }, [ready]);
 
-  // Global keyboard shortcuts.
+  // Global keyboard shortcuts — matching lives in `@/lib/shortcuts`.
   useEffect(() => {
-    const isMac = platform() === "macos";
     const onKey = (e: KeyboardEvent) => {
-      const s = useStore.getState();
-      const mod = isMac ? e.metaKey : e.ctrlKey;
-      const k = e.key.toLowerCase();
+      const hit = matchShortcut(e);
+      if (!hit) return;
 
-      const eat = () => {
+      if (hit.kind === "escape") {
+        const s = useStore.getState();
+        if (
+          !(
+            s.voiceOpen ||
+            s.voiceSetupOpen ||
+            s.quickOpenOpen ||
+            s.findOpen ||
+            s.gotoOpen ||
+            s.settingsOpen ||
+            s.sessionNameOpen ||
+            s.menuOpen
+          )
+        ) {
+          return;
+        }
         e.preventDefault();
         e.stopPropagation();
-      };
-
-      if (mod && k === "n" && !e.shiftKey) {
-        eat();
-        s.newTab();
-        return;
-      }
-      if (mod && e.shiftKey && k === "n") {
-        eat();
-        runMenuAction("newWindow");
-        return;
-      }
-      if (mod && k === "o") {
-        eat();
-        void s.openDialog();
-        return;
-      }
-      if (mod && k === "p") {
-        eat();
-        s.setQuickOpenOpen(true);
-        return;
-      }
-      if (mod && !e.shiftKey && k === "s") {
-        eat();
-        if (s.activeTabId) void s.saveTab(s.activeTabId);
-        return;
-      }
-      if (mod && e.shiftKey && k === "s") {
-        eat();
-        if (s.activeTabId) void s.saveAsTab(s.activeTabId);
-        return;
-      }
-      if (mod && k === "w") {
-        eat();
-        if (s.activeTabId) s.requestClose(s.activeTabId);
-        return;
-      }
-      if (mod && k === "f") {
-        eat();
-        s.setFindOpen(true);
-        return;
-      }
-      if (isMac ? mod && e.altKey && k === "f" : mod && k === "h") {
-        eat();
-        s.setReplaceOpen(true);
-        return;
-      }
-      if (mod && k === "g") {
-        eat();
-        s.setGotoOpen(true);
-        return;
-      }
-      if (mod && k === ",") {
-        eat();
-        s.setSettingsOpen(true);
-        return;
-      }
-      if (mod && e.shiftKey && k === "t") {
-        eat();
-        void s.toggleAlwaysOnTop();
-        return;
-      }
-      if (mod && e.shiftKey && k === "r") {
-        eat();
-        void s.requestVoiceDictation();
-        return;
-      }
-      if (e.key === "F5") {
-        eat();
-        const v = getEditorView();
-        if (v) insertAtCursor(v, timeDateString(locale));
-        return;
-      }
-      if (mod && (k === "=" || k === "+")) {
-        eat();
-        s.setSettings({ zoom: clamp(s.settings.zoom + 10, 30, 500) });
-        return;
-      }
-      if (mod && k === "-") {
-        eat();
-        s.setSettings({ zoom: clamp(s.settings.zoom - 10, 30, 500) });
-        return;
-      }
-      if (mod && k === "0") {
-        eat();
-        s.setSettings({ zoom: 100 });
-        return;
-      }
-
-      // Tab switching: Ctrl+Tab, Ctrl+PageUp/Down, Cmd+Option+←/→ (mac), Mod+1..9
-      const switchTabBy = (delta: number) => {
-        if (s.tabs.length < 2) return;
-        const idx = s.tabs.findIndex((t2) => t2.id === s.activeTabId);
-        const n = (idx + delta + s.tabs.length) % s.tabs.length;
-        if (s.tabs[n]) {
-          s.setActiveTab(s.tabs[n].id);
-          requestAnimationFrame(() => getEditorView()?.focus());
-        }
-      };
-      const jumpTab = (oneBased: number) => {
-        if (!s.tabs.length) return;
-        const i = oneBased >= 9 ? s.tabs.length - 1 : oneBased - 1;
-        if (s.tabs[i]) {
-          s.setActiveTab(s.tabs[i].id);
-          requestAnimationFrame(() => getEditorView()?.focus());
-        }
-      };
-
-      if (e.ctrlKey && e.key === "Tab") {
-        eat();
-        switchTabBy(e.shiftKey ? -1 : 1);
-        return;
-      }
-      if (e.ctrlKey && (e.key === "PageDown" || e.key === "PageUp")) {
-        eat();
-        switchTabBy(e.key === "PageDown" ? 1 : -1);
-        return;
-      }
-      if (isMac && mod && e.altKey && (e.key === "ArrowRight" || e.key === "ArrowLeft")) {
-        eat();
-        switchTabBy(e.key === "ArrowRight" ? 1 : -1);
-        return;
-      }
-      if (mod && !e.altKey && !e.shiftKey && /^[1-9]$/.test(e.key)) {
-        eat();
-        jumpTab(parseInt(e.key, 10));
-        return;
-      }
-
-      if (e.key === "Escape") {
-        if (
-          s.voiceOpen ||
-          s.voiceSetupOpen ||
-          s.quickOpenOpen ||
-          s.findOpen ||
-          s.gotoOpen ||
-          s.settingsOpen ||
-          s.sessionNameOpen ||
-          s.menuOpen
-        ) {
-          eat();
-          if (s.voiceSetupOpen) {
-            s.setVoiceSetupOpen(false);
-          } else if (s.voiceOpen) {
-            s.setVoiceOpen(false);
-            getEditorView()?.focus();
-          } else if (s.quickOpenOpen) {
-            s.setQuickOpenOpen(false);
-            getEditorView()?.focus();
-          } else if (s.findOpen) {
-            s.setFindOpen(false);
-            s.setReplaceOpen(false);
-            getEditorView()?.focus();
-          } else if (s.gotoOpen) {
-            s.setGotoOpen(false);
-          } else if (s.settingsOpen) {
-            s.setSettingsOpen(false);
-          } else if (s.sessionNameOpen) {
-            s.setSessionNameOpen(false);
-          } else if (s.menuOpen) {
-            s.setMenuOpen(null);
-          }
+        if (s.voiceSetupOpen) {
+          s.setVoiceSetupOpen(false);
+        } else if (s.voiceOpen) {
+          s.setVoiceOpen(false);
+          getEditorView()?.focus();
+        } else if (s.quickOpenOpen) {
+          s.setQuickOpenOpen(false);
+          getEditorView()?.focus();
+        } else if (s.findOpen) {
+          s.setFindOpen(false);
+          s.setReplaceOpen(false);
+          getEditorView()?.focus();
+        } else if (s.gotoOpen) {
+          s.setGotoOpen(false);
+        } else if (s.settingsOpen) {
+          s.setSettingsOpen(false);
+        } else if (s.sessionNameOpen) {
+          s.setSessionNameOpen(false);
+        } else if (s.menuOpen) {
+          s.setMenuOpen(null);
         }
         return;
+      }
+
+      e.preventDefault();
+      e.stopPropagation();
+
+      if (hit.kind === "action") {
+        runMenuAction(hit.id);
+        return;
+      }
+
+      // tabJump
+      const s = useStore.getState();
+      if (!s.tabs.length) return;
+      const i = hit.index >= 9 ? s.tabs.length - 1 : hit.index - 1;
+      if (s.tabs[i]) {
+        s.setActiveTab(s.tabs[i].id);
+        requestAnimationFrame(() => getEditorView()?.focus());
       }
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
-  }, [locale]);
+  }, []);
 
   // Intercept window close to save drafts / prompt for unsaved changes.
   useEffect(() => {

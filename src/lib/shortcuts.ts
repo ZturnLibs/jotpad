@@ -244,7 +244,12 @@ export const SHORTCUTS: readonly ShortcutDef[] = [
   // View
   {
     id: "zoomIn",
-    chords: [{ key: ["=", "+"], mod: true }],
+    // `+` may arrive as key="+" with shift held (US layout Shift+=).
+    chords: [
+      { key: "=", mod: true },
+      { key: "+", mod: true },
+      { key: "+", mod: true, shift: true },
+    ],
     label: `${MOD}+Plus`,
     accel: A("="),
   },
