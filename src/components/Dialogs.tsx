@@ -23,13 +23,19 @@ export function ConfirmDialog() {
       : t("tab.untitled")
     : "";
   const title =
-    confirm.kind === "exit" ? t("dialog.confirmCloseTitle") : t("dialog.saveChangesTitle");
+    confirm.kind === "exit"
+      ? t("dialog.confirmCloseTitle")
+      : confirm.kind === "update"
+        ? t("update.title")
+        : t("dialog.saveChangesTitle");
   const msg =
     confirm.kind === "exit"
       ? t("dialog.confirmExitMsg")
       : confirm.kind === "openSession"
         ? t("dialog.openSessionMsg")
-        : t("dialog.saveChangesMsg", { name });
+        : confirm.kind === "update"
+          ? t("update.confirmDirty")
+          : t("dialog.saveChangesMsg", { name });
 
   return (
     <div
@@ -209,6 +215,7 @@ export function SessionNameDialog() {
 export function About() {
   const open = useStore((s) => s.aboutOpen);
   const setOpen = useStore((s) => s.setAboutOpen);
+  const checkForUpdates = useStore((s) => s.checkForUpdates);
   const t = useT();
   const [version, setVersion] = useState("");
   useEffect(() => {
@@ -229,8 +236,15 @@ export function About() {
         <h3 className="about-title">Jotpad</h3>
         <p className="about-desc">{t("misc.aboutText")}</p>
         {version ? <p className="about-version muted">v{version}</p> : null}
-        <div className="dialog-actions">
-          <button className="btn primary" onClick={() => setOpen(false)}>
+        <div className="dialog-actions about-actions">
+          <button
+            type="button"
+            className="btn"
+            onClick={() => void checkForUpdates({ manual: true })}
+          >
+            {t("misc.checkUpdate")}
+          </button>
+          <button type="button" className="btn primary" onClick={() => setOpen(false)}>
             {t("dialog.cancel")}
           </button>
         </div>

@@ -20,6 +20,7 @@ import { ContextMenu } from "@/components/ContextMenu";
 import { PageSetup } from "@/components/PageSetup";
 import { QuickOpen } from "@/components/QuickOpen";
 import { About, ConfirmDialog, GotoDialog, ReloadDialog, SessionNameDialog } from "@/components/Dialogs";
+import { UpdateDialog } from "@/components/UpdateDialog";
 
 function applyTheme(mode: "light" | "dark" | "system") {
   const effective =
@@ -69,6 +70,15 @@ export function App() {
     void startNativeMenuListener();
     applyNativeMenuDebounced();
   }, [ready, settings, activeTabId, tabsLen, recentLen, sessionsLen, alwaysOnTop]);
+
+  // 启动后延迟静默检查更新（可在设置关闭）。
+  useEffect(() => {
+    if (!ready || !settings.autoCheckUpdates) return;
+    const timer = window.setTimeout(() => {
+      void useStore.getState().checkForUpdates({ manual: false });
+    }, 4000);
+    return () => window.clearTimeout(timer);
+  }, [ready, settings.autoCheckUpdates]);
 
   // Apply theme; react to system changes when in "system" mode.
   useEffect(() => {
@@ -320,6 +330,7 @@ export function App() {
       <PageSetup />
       <Settings />
       <About />
+      <UpdateDialog />
     </div>
   );
 }

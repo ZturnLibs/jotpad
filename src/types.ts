@@ -79,6 +79,10 @@ export interface AppSettings {
   /** Whether to restore open tabs on launch. */
   startupMode: StartupMode;
   accent: string; // "system" or hex like "#0067C0"
+  /** 启动后静默检查更新（默认开）。 */
+  autoCheckUpdates: boolean;
+  /** 用户选择跳过的远端版本号；再次出现同版本时启动检查不弹窗。 */
+  skippedUpdateVersion: string | null;
 }
 
 export interface AppState {
@@ -102,6 +106,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   spellCheck: false,
   startupMode: "restore",
   accent: "system",
+  autoCheckUpdates: true,
+  skippedUpdateVersion: null,
 };
 
 /** Accent color presets shown in Settings. "system" follows the OS accent. */

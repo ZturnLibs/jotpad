@@ -53,12 +53,20 @@ pnpm tauri build --debug --no-bundle
 推送 `v*` tag 会触发 GitHub Actions，构建 macOS（arm64 / x64）、Windows、Linux x64 安装包并写入 [GitHub Releases](https://github.com/ZturnLibs/jotpad/releases)：
 
 ```bash
-# 确认三处 version 已更新，例如 0.1.1
-git tag v0.1.1
-git push origin v0.1.1
+# 确认三处 version 已更新，例如 0.1.2
+git tag v0.1.2
+git push origin v0.1.2
 ```
 
 也可在 Actions 页手动运行 `release` workflow。关于对话框版本来自 `tauri.conf.json`（`getVersion()`）。
+
+应用内更新（`plugin-updater`）读取：
+
+`https://github.com/ZturnLibs/jotpad/releases/latest/download/latest.json`
+
+发版 CI 需配置 Secrets：`TAURI_SIGNING_PRIVATE_KEY`、`TAURI_SIGNING_PRIVATE_KEY_PASSWORD`（可空）、`RELEASE_TOKEN`。私钥丢失后已安装客户端将无法验签升级，须妥善备份 `~/.tauri/jotpad.key`。
+
+Linux 应用内升级仅覆盖 **AppImage**；`.deb`/`.rpm` 用户会提示打开发布页手动安装。
 
 ### 发布前检查清单
 

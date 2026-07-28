@@ -1068,3 +1068,30 @@ textarea {
   font-size: 12px;
   margin-bottom: 18px;
 }
+.about-actions {
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+/* ---------- Update dialog ---------- */
+.update-dialog {
+  min-width: 320px;
+  max-width: 440px;
+}
+.update-notes {
+  white-space: pre-wrap;
+  max-height: 180px;
+  overflow: auto;
+}
+.update-progress {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--border);
+  margin: 4px 0 12px;
+  overflow: hidden;
+}
+.update-progress-bar {
+  height: 100%;
+  background: var(--accent, #0067c0);
+  transition: width 0.15s ease;
+}

@@ -16,6 +16,13 @@ import { DEFAULT_SETTINGS } from "@/types";
 import * as api from "@/lib/backend";
 import { basename, dirname, joinPath } from "@/lib/backend";
 import { getEditorView } from "@/lib/editorRef";
+import {
+  checkForAppUpdate,
+  discardPendingUpdate,
+  downloadAndInstallPending,
+  openReleasesPage,
+  relaunchApp,
+} from "@/lib/updater";
 
 const STATE_VERSION = 2;
 const MAX_RECENT = 20;
@@ -24,10 +31,42 @@ const MAX_SESSIONS = 20;
 export type MenuKind = "file" | "edit" | "view" | null;
 
 interface ConfirmState {
-  kind: "close" | "exit" | "openSession";
+  kind: "close" | "exit" | "openSession" | "update";
   tabIds: string[];
   sessionId?: string;
 }
+
+export type UpdatePhase =
+  | "idle"
+  | "checking"
+  | "available"
+  | "upToDate"
+  | "downloading"
+  | "error";
+
+export interface UpdateUiState {
+  open: boolean;
+  phase: UpdatePhase;
+  manual: boolean;
+  version: string | null;
+  notes: string | null;
+  skipped: boolean;
+  canInstallInApp: boolean;
+  progress: number | null;
+  error: string | null;
+}
+
+const IDLE_UPDATE_UI: UpdateUiState = {
+  open: false,
+  phase: "idle",
+  manual: false,
+  version: null,
+  notes: null,
+  skipped: false,
+  canInstallInApp: true,
+  progress: null,
+  error: null,
+};
 
 interface ReloadPrompt {
   tabId: string;
@@ -63,6 +102,9 @@ interface Store {
   voiceSetupOpen: boolean;
   /** 打开设置时定位到语音区块。 */
   settingsFocus: "voice" | null;
+
+  /** 应用内更新对话框状态（不持久化）。 */
+  updateUi: UpdateUiState;
 
   // Derived
   activeTab: () => TabState | undefined;
@@ -126,6 +168,15 @@ interface Store {
   /** 菜单/快捷键入口：未就绪则引导下载，就绪则开录音条。 */
   requestVoiceDictation: () => Promise<void>;
 
+  /** 检查更新；manual 时总是展示结果对话框。 */
+  checkForUpdates: (opts?: { manual?: boolean }) => Promise<void>;
+  dismissUpdateDialog: () => void;
+  skipPendingUpdate: () => Promise<void>;
+  installPendingUpdate: () => Promise<void>;
+  /** 已处理未保存确认后的实际下载安装。 */
+  proceedInstallUpdate: () => Promise<void>;
+  openUpdateDownloadPage: () => Promise<void>;
+
   // Exit
   requestExit: () => Promise<void>;
 }
@@ -158,6 +209,10 @@ function normalizeSettings(raw: Partial<AppSettings> & Record<string, unknown>):
   const merged = { ...DEFAULT_SETTINGS, ...raw };
   const startupMode: StartupMode =
     merged.startupMode === "blank" ? "blank" : "restore";
+  const skipped =
+    typeof merged.skippedUpdateVersion === "string" && merged.skippedUpdateVersion
+      ? merged.skippedUpdateVersion
+      : null;
   return {
     theme: merged.theme,
     locale: merged.locale,
@@ -170,6 +225,8 @@ function normalizeSettings(raw: Partial<AppSettings> & Record<string, unknown>):
     spellCheck: !!merged.spellCheck,
     startupMode,
     accent: merged.accent,
+    autoCheckUpdates: merged.autoCheckUpdates !== false,
+    skippedUpdateVersion: skipped,
   };
 }
 
@@ -259,6 +316,7 @@ export const useStore = create<Store>((set, get) => ({
   voiceOpen: false,
   voiceSetupOpen: false,
   settingsFocus: null,
+  updateUi: { ...IDLE_UPDATE_UI },
 
   activeTab: () => {
     const { tabs, activeTabId } = get();
@@ -382,6 +440,11 @@ export const useStore = create<Store>((set, get) => ({
     }
     if (c.kind === "openSession" && c.sessionId) {
       await get().openSession(c.sessionId);
+      return;
+    }
+    if (c.kind === "update") {
+      // 保存或丢弃后继续安装；不关标签（重启后由启动策略恢复）。
+      await get().proceedInstallUpdate();
       return;
     }
     get().doCloseTabs(c.tabIds);
@@ -833,6 +896,133 @@ export const useStore = create<Store>((set, get) => ({
       set({ voiceSetupOpen: false, voiceOpen: true, findOpen: false, replaceOpen: false });
     } else {
       set({ voiceOpen: false, voiceSetupOpen: true });
+    }
+  },
+
+  checkForUpdates: async (opts) => {
+    const manual = !!opts?.manual;
+    const skippedVersion = get().settings.skippedUpdateVersion;
+    set({
+      updateUi: {
+        ...IDLE_UPDATE_UI,
+        open: manual,
+        phase: "checking",
+        manual,
+      },
+      aboutOpen: manual ? false : get().aboutOpen,
+    });
+    const result = await checkForAppUpdate({ skippedVersion });
+    if (result.status === "upToDate") {
+      if (manual) {
+        set({
+          updateUi: { ...IDLE_UPDATE_UI, open: true, phase: "upToDate", manual: true },
+        });
+      } else {
+        set({ updateUi: { ...IDLE_UPDATE_UI } });
+      }
+      return;
+    }
+    if (result.status === "error") {
+      if (manual) {
+        set({
+          updateUi: {
+            ...IDLE_UPDATE_UI,
+            open: true,
+            phase: "error",
+            manual: true,
+            error: result.message,
+          },
+        });
+      } else {
+        set({ updateUi: { ...IDLE_UPDATE_UI } });
+      }
+      return;
+    }
+    // available
+    if (!manual && result.skipped) {
+      await discardPendingUpdate();
+      set({ updateUi: { ...IDLE_UPDATE_UI } });
+      return;
+    }
+    set({
+      updateUi: {
+        open: true,
+        phase: "available",
+        manual,
+        version: result.version,
+        notes: result.notes,
+        skipped: result.skipped,
+        canInstallInApp: result.canInstallInApp,
+        progress: null,
+        error: null,
+      },
+    });
+  },
+
+  dismissUpdateDialog: () => {
+    void discardPendingUpdate();
+    set({ updateUi: { ...IDLE_UPDATE_UI } });
+  },
+
+  skipPendingUpdate: async () => {
+    const ver = get().updateUi.version;
+    if (ver) {
+      set((s) => ({
+        settings: { ...s.settings, skippedUpdateVersion: ver },
+      }));
+      void get().persist();
+    }
+    await discardPendingUpdate();
+    set({ updateUi: { ...IDLE_UPDATE_UI } });
+  },
+
+  installPendingUpdate: async () => {
+    if (!get().updateUi.canInstallInApp) {
+      await get().openUpdateDownloadPage();
+      return;
+    }
+    const dirtyIds = get()
+      .tabs.filter((t) => t.dirty)
+      .map((t) => t.id);
+    if (dirtyIds.length) {
+      set({ confirm: { kind: "update", tabIds: dirtyIds } });
+      return;
+    }
+    await get().proceedInstallUpdate();
+  },
+
+  proceedInstallUpdate: async () => {
+    set((s) => ({
+      updateUi: { ...s.updateUi, open: true, phase: "downloading", progress: null, error: null },
+    }));
+    try {
+      await get().persist();
+      await downloadAndInstallPending((pct) => {
+        set((s) => ({ updateUi: { ...s.updateUi, progress: pct } }));
+      });
+      // 清除跳过标记，避免升版后仍记住旧 skip
+      set((s) => ({
+        settings: { ...s.settings, skippedUpdateVersion: null },
+      }));
+      await get().persist();
+      await relaunchApp();
+    } catch (e) {
+      set((s) => ({
+        updateUi: {
+          ...s.updateUi,
+          open: true,
+          phase: "error",
+          error: e instanceof Error ? e.message : String(e),
+        },
+      }));
+    }
+  },
+
+  openUpdateDownloadPage: async () => {
+    try {
+      await openReleasesPage();
+    } catch (e) {
+      console.error("open releases failed", e);
     }
   },
 

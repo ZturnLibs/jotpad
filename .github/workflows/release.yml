@@ -64,10 +64,13 @@ jobs:
         run: pnpm test
 
       # 组织默认禁用 GITHUB_TOKEN 写权限，需配置仓库 Secret RELEASE_TOKEN（repo 权限）
+      # 更新签名：TAURI_SIGNING_PRIVATE_KEY（必填）与可选密码
       - name: Build and upload release
         uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tagName: v__VERSION__
           releaseName: Jotpad v__VERSION__
@@ -77,9 +80,12 @@ jobs:
             从下方 Assets 下载对应平台安装包：
             - macOS：`.dmg`（Apple Silicon / Intel 各一份）
             - Windows：`.msi` / NSIS 安装包
-            - Linux：`.deb` / `.AppImage`
+            - Linux：`.deb` / `.AppImage`（应用内更新仅支持 AppImage）
 
-            > 当前未配置代码签名与公证；macOS 首次打开可能需在「系统设置 → 隐私与安全性」中允许。
+            应用内更新依赖本 Release 的 `latest.json` 与签名产物（`.sig`）。
+
+            > 当前未配置 Apple/Windows 代码签名与公证；macOS 首次打开可能需在「系统设置 → 隐私与安全性」中允许。
           releaseDraft: false
           prerelease: false
+          updaterJsonPreferNsis: true
           args: ${{ matrix.args }}

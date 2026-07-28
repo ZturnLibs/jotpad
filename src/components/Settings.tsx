@@ -332,6 +332,14 @@ export function Settings() {
                     onChange={(v) => setSettings({ showStatusBar: v })}
                     label={t("settings.showStatusBar")}
                   />
+                  <Toggle
+                    on={settings.autoCheckUpdates}
+                    onChange={(v) => {
+                      setSettings({ autoCheckUpdates: v });
+                      void useStore.getState().persist();
+                    }}
+                    label={t("settings.autoCheckUpdates")}
+                  />
                 </div>
                 <div className="field" style={{ marginTop: 12 }}>
                   <label>{t("settings.startup")}</label>

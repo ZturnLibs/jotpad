@@ -286,11 +286,21 @@ fn system_accent() -> [u8; 3] {
     [0, 120, 212]
 }
 
+/// 当前可执行路径；Linux 上用于判断是否 AppImage（仅 AppImage 支持应用内升级）。
+#[tauri::command]
+fn current_exe_path() -> Result<String, String> {
+    std::env::current_exe()
+        .map(|p| p.to_string_lossy().into_owned())
+        .map_err(|e| e.to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .manage(voice::VoiceDownloadFlag::default())
         .invoke_handler(tauri::generate_handler![
             read_file,
@@ -304,6 +314,7 @@ pub fn run() {
             clipboard_read_text,
             clipboard_write_text,
             get_system_accent,
+            current_exe_path,
             shell_integration::take_pending_open_paths,
             shell_integration::shell_integration_status,
             shell_integration::set_shell_new_text_file,

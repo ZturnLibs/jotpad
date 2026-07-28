@@ -225,6 +225,26 @@ const zhCN: Dict = {
   "misc.emptyHint": "新建一个标签页开始编写",
   "misc.about": "关于 Jotpad",
   "misc.aboutText": "一款跨平台记事本",
+  "misc.checkUpdate": "检查更新…",
+
+  // Update
+  "update.title": "软件更新",
+  "update.checking": "正在检查更新…",
+  "update.upToDate": "当前已是最新版本。",
+  "update.availableTitle": "发现新版本 v{version}",
+  "update.availableBody": "新版本 v{version} 已就绪。",
+  "update.skippedHint": "你曾跳过此版本。仍可立即更新。",
+  "update.linuxManualHint": "当前安装方式不支持应用内升级，请从发布页下载安装包（推荐 AppImage 以启用后续自动更新）。",
+  "update.downloadingTitle": "正在下载更新",
+  "update.downloading": "正在下载…",
+  "update.downloadingPct": "正在下载… {pct}%",
+  "update.install": "立即更新",
+  "update.later": "稍后",
+  "update.skip": "跳过此版本",
+  "update.openDownload": "打开下载页",
+  "update.checkFailed": "检查更新失败，请稍后重试或手动下载。",
+  "update.confirmDirty": "更新前有未保存的更改，是否先保存？",
+  "settings.autoCheckUpdates": "启动时检查更新",
 };
 
 const en: Dict = {
@@ -433,6 +453,25 @@ const en: Dict = {
   "misc.emptyHint": "Create a new tab to start writing",
   "misc.about": "About Jotpad",
   "misc.aboutText": "A cross-platform notepad",
+  "misc.checkUpdate": "Check for Updates…",
+
+  "update.title": "Software Update",
+  "update.checking": "Checking for updates…",
+  "update.upToDate": "You're up to date.",
+  "update.availableTitle": "Update available: v{version}",
+  "update.availableBody": "Version v{version} is ready to install.",
+  "update.skippedHint": "You previously skipped this version. You can still update now.",
+  "update.linuxManualHint": "In-app updates require the AppImage build. Please download the installer from the releases page.",
+  "update.downloadingTitle": "Downloading update",
+  "update.downloading": "Downloading…",
+  "update.downloadingPct": "Downloading… {pct}%",
+  "update.install": "Update Now",
+  "update.later": "Later",
+  "update.skip": "Skip This Version",
+  "update.openDownload": "Open Download Page",
+  "update.checkFailed": "Could not check for updates. Try again later or download manually.",
+  "update.confirmDirty": "You have unsaved changes. Save them before updating?",
+  "settings.autoCheckUpdates": "Check for updates on startup",
 };
 
 const DICTS: Record<Locale, Dict> = {

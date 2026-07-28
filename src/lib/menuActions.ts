@@ -172,6 +172,7 @@ export function getMenuModel(): MenuModel {
     { id: "print", label: t("file.print") },
     { sep: true },
     { id: "about", label: t("misc.about") },
+    { id: "checkUpdate", label: t("misc.checkUpdate") },
     { id: "exit", label: t("file.exit"), ...sc("exit") },
   ];
 
@@ -344,6 +345,9 @@ export function runMenuAction(id: string): void {
       break;
     case "about":
       s.setAboutOpen(true);
+      break;
+    case "checkUpdate":
+      void s.checkForUpdates({ manual: true });
       break;
     case "exit":
       void s.requestExit();

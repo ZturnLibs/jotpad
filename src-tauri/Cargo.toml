@@ -1,6 +1,6 @@
 [package]
 name = "jotpad"
-version = "0.1.0"
+version = "0.1.1"
 description = "Jotpad — A cross-platform notepad"
 authors = ["Jotpad"]
 edition = "2021"
@@ -26,6 +26,8 @@ tar = "0.4"
 bzip2 = "0.5"
 base64 = "0.22"
 tokio = { version = "1", features = ["fs", "io-util", "process", "sync", "rt"] }
+tauri-plugin-updater = "2.10.1"
+tauri-plugin-process = "2.3.1"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 plist = "1"

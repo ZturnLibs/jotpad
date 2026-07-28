@@ -66,15 +66,19 @@ export async function applyNativeMenu(): Promise<void> {
     // "Jotpad" (capital J) so the OS doesn't synthesize one from the lowercase
     // process/executable name.
     const about = model.file.find((i) => i.id === "about");
+    const checkUpdate = model.file.find((i) => i.id === "checkUpdate");
     const exit = model.file.find((i) => i.id === "exit");
     const appItems: MenuItemModel[] = [];
     if (about) appItems.push(about);
+    if (checkUpdate) appItems.push(checkUpdate);
     appItems.push({ sep: true });
     if (exit) appItems.push(exit);
     menus.push({ type: "submenu", text: "Jotpad", items: toDefs(appItems) });
 
-    // File menu without About/Exit (now in the app menu); trim trailing separator.
-    let fileItems = model.file.filter((i) => i.id !== "about" && i.id !== "exit");
+    // File menu without About/Exit/CheckUpdate (now in the app menu); trim trailing separator.
+    let fileItems = model.file.filter(
+      (i) => i.id !== "about" && i.id !== "checkUpdate" && i.id !== "exit",
+    );
     while (fileItems.length && fileItems[fileItems.length - 1].sep) fileItems.pop();
     menus.push({ type: "submenu", text: model.fileLabel, items: toDefs(fileItems) });
   } else {
