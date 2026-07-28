@@ -17,6 +17,7 @@ import { StatusBar } from "@/components/StatusBar";
 import { Settings } from "@/components/Settings";
 import { ContextMenu } from "@/components/ContextMenu";
 import { PageSetup } from "@/components/PageSetup";
+import { QuickOpen } from "@/components/QuickOpen";
 import { About, ConfirmDialog, GotoDialog, ReloadDialog, SessionNameDialog } from "@/components/Dialogs";
 
 function applyTheme(mode: "light" | "dark" | "system") {
@@ -171,6 +172,11 @@ export function App() {
         void s.openDialog();
         return;
       }
+      if (mod && k === "p") {
+        eat();
+        s.setQuickOpenOpen(true);
+        return;
+      }
       if (mod && !e.shiftKey && k === "s") {
         eat();
         if (s.activeTabId) void s.saveTab(s.activeTabId);
@@ -241,9 +247,19 @@ export function App() {
         return;
       }
       if (e.key === "Escape") {
-        if (s.findOpen || s.gotoOpen || s.settingsOpen || s.menuOpen) {
+        if (
+          s.quickOpenOpen ||
+          s.findOpen ||
+          s.gotoOpen ||
+          s.settingsOpen ||
+          s.sessionNameOpen ||
+          s.menuOpen
+        ) {
           eat();
-          if (s.findOpen) {
+          if (s.quickOpenOpen) {
+            s.setQuickOpenOpen(false);
+            getEditorView()?.focus();
+          } else if (s.findOpen) {
             s.setFindOpen(false);
             s.setReplaceOpen(false);
             getEditorView()?.focus();
@@ -251,6 +267,8 @@ export function App() {
             s.setGotoOpen(false);
           } else if (s.settingsOpen) {
             s.setSettingsOpen(false);
+          } else if (s.sessionNameOpen) {
+            s.setSessionNameOpen(false);
           } else if (s.menuOpen) {
             s.setMenuOpen(null);
           }
@@ -358,6 +376,7 @@ export function App() {
         </main>
       </div>
       <ContextMenu />
+      <QuickOpen />
       <ConfirmDialog />
       <SessionNameDialog />
       <ReloadDialog />

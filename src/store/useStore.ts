@@ -46,6 +46,7 @@ interface Store {
   findOpen: boolean;
   replaceOpen: boolean;
   gotoOpen: boolean;
+  quickOpenOpen: boolean;
   settingsOpen: boolean;
   aboutOpen: boolean;
   pageSetupOpen: boolean;
@@ -104,6 +105,7 @@ interface Store {
   setFindOpen: (v: boolean) => void;
   setReplaceOpen: (v: boolean) => void;
   setGotoOpen: (v: boolean) => void;
+  setQuickOpenOpen: (v: boolean) => void;
   setSettingsOpen: (v: boolean) => void;
   setAboutOpen: (v: boolean) => void;
   setPageSetupOpen: (v: boolean) => void;
@@ -231,6 +233,7 @@ export const useStore = create<Store>((set, get) => ({
   findOpen: false,
   replaceOpen: false,
   gotoOpen: false,
+  quickOpenOpen: false,
   settingsOpen: false,
   aboutOpen: false,
   pageSetupOpen: false,
@@ -764,6 +767,7 @@ export const useStore = create<Store>((set, get) => ({
   setFindOpen: (v) => set({ findOpen: v, replaceOpen: v ? get().replaceOpen : false }),
   setReplaceOpen: (v) => set({ replaceOpen: v, findOpen: v ? true : get().findOpen }),
   setGotoOpen: (v) => set({ gotoOpen: v }),
+  setQuickOpenOpen: (v) => set({ quickOpenOpen: v }),
   setSettingsOpen: (v) => set({ settingsOpen: v }),
   setAboutOpen: (v) => set({ aboutOpen: v }),
   setPageSetupOpen: (v) => set({ pageSetupOpen: v }),

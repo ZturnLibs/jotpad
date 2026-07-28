@@ -158,6 +158,12 @@ export function getMenuModel(): MenuModel {
     },
     { id: "open", label: t("file.open"), shortcut: `${MOD}+O`, accel: A("O") },
     {
+      id: "quickOpen",
+      label: t("file.quickOpen"),
+      shortcut: `${MOD}+P`,
+      accel: A("P"),
+    },
+    {
       id: "recent",
       label: t("file.recent"),
       submenu: recentItems,
@@ -179,7 +185,7 @@ export function getMenuModel(): MenuModel {
     },
     { sep: true },
     { id: "pageSetup", label: t("file.pageSetup") },
-    { id: "print", label: t("file.print"), shortcut: `${MOD}+P`, accel: A("P") },
+    { id: "print", label: t("file.print") },
     { sep: true },
     { id: "about", label: t("misc.about") },
     { id: "exit", label: t("file.exit"), accel: A("Q") },
@@ -328,6 +334,9 @@ export function runMenuAction(id: string): void {
       break;
     case "open":
       void s.openDialog();
+      break;
+    case "quickOpen":
+      s.setQuickOpenOpen(true);
       break;
     case "clearRecent":
       s.clearRecent();

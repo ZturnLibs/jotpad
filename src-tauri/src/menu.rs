@@ -216,12 +216,13 @@ pub fn default_menu<R: Runtime, M: Manager<R>>(
             item("new", "新建标签页", Some("CmdOrCtrl+N")),
             item("newWindow", "新建窗口", Some("CmdOrCtrl+Shift+N")),
             item("open", "打开…", Some("CmdOrCtrl+O")),
+            item("quickOpen", "快速打开…", Some("CmdOrCtrl+P")),
             SEP,
             item("save", "保存", Some("CmdOrCtrl+S")),
             item("saveAs", "另存为…", Some("CmdOrCtrl+Shift+S")),
             SEP,
             item("pageSetup", "页面设置…", None),
-            item("print", "打印…", Some("CmdOrCtrl+P")),
+            item("print", "打印…", None),
         ],
     };
 

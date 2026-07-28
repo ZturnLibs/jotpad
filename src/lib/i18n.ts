@@ -19,6 +19,7 @@ const zhCN: Dict = {
   "file.newKey": "Ctrl+N",
   "file.newWindow": "新建窗口",
   "file.open": "打开…",
+  "file.quickOpen": "快速打开…",
   "file.recent": "最近打开的文件",
   "file.recentEmpty": "（无）",
   "file.clearRecent": "清除最近文件",
@@ -119,6 +120,13 @@ const zhCN: Dict = {
   "goto.title": "转到行",
   "goto.line": "行号",
 
+  "quickOpen.title": "快速打开",
+  "quickOpen.placeholder": "搜索已打开或最近的文件（{mod}+P）",
+  "quickOpen.empty": "无匹配项",
+  "quickOpen.openTab": "已打开",
+  "quickOpen.badgeOpen": "打开中",
+  "quickOpen.badgeRecent": "最近",
+
   // Dialogs
   "dialog.saveChangesTitle": "Jotpad",
   "dialog.saveChangesMsg": "是否要将更改保存到 {name}？",
@@ -199,6 +207,7 @@ const en: Dict = {
   "file.newKey": "Ctrl+N",
   "file.newWindow": "New Window",
   "file.open": "Open…",
+  "file.quickOpen": "Quick Open…",
   "file.recent": "Recent Files",
   "file.recentEmpty": "(Empty)",
   "file.clearRecent": "Clear Recent Files",
@@ -292,6 +301,13 @@ const en: Dict = {
 
   "goto.title": "Go to Line",
   "goto.line": "Line number",
+
+  "quickOpen.title": "Quick Open",
+  "quickOpen.placeholder": "Search open or recent files ({mod}+P)",
+  "quickOpen.empty": "No matches",
+  "quickOpen.openTab": "Open tab",
+  "quickOpen.badgeOpen": "Open",
+  "quickOpen.badgeRecent": "Recent",
 
   "dialog.saveChangesTitle": "Jotpad",
   "dialog.saveChangesMsg": "Do you want to save changes to {name}?",

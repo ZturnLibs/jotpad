@@ -3,6 +3,7 @@ import { basename, dirname, joinPath } from "@/lib/backend";
 import { pageSizeCss, type PrintSetup } from "@/lib/print";
 import { clamp } from "@/lib/utils";
 import { countWords, selectedLineCount } from "@/lib/textStats";
+import { fuzzyFilter, fuzzyScore } from "@/lib/fuzzy";
 
 describe("path helpers", () => {
   it("basename handles posix and windows separators", () => {
@@ -55,5 +56,24 @@ describe("textStats", () => {
     expect(selectedLineCount(0, 0, lineAt)).toBe(0);
     expect(selectedLineCount(0, 4, lineAt)).toBe(1);
     expect(selectedLineCount(0, 9, lineAt)).toBe(2);
+  });
+});
+
+describe("fuzzy", () => {
+  it("matches subsequences", () => {
+    expect(fuzzyScore("nt", "notes.txt")).not.toBeNull();
+    expect(fuzzyScore("xyz", "notes.txt")).toBeNull();
+  });
+
+  it("ranks prefix-ish matches higher", () => {
+    const a = fuzzyScore("note", "notes.txt")!;
+    const b = fuzzyScore("note", "readme-note.md")!;
+    expect(a).toBeGreaterThan(b);
+  });
+
+  it("filters and sorts items", () => {
+    const items = ["alpha.txt", "beta.log", "readme.md"];
+    expect(fuzzyFilter(items, "alph", (x) => x)).toEqual(["alpha.txt"]);
+    expect(fuzzyFilter(items, "", (x) => x)).toEqual(items);
   });
 });
