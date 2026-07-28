@@ -246,6 +246,8 @@ export function getMenuModel(): MenuModel {
       shortcut: `${MOD}+Shift+T`,
       accel: A("Shift+T"),
     },
+    { id: "nextTab", label: t("view.nextTab"), shortcut: isMac ? `${MOD}+Option+→` : "Ctrl+Tab" },
+    { id: "prevTab", label: t("view.prevTab"), shortcut: isMac ? `${MOD}+Option+←` : "Ctrl+Shift+Tab" },
     {
       id: "wordWrap",
       label: t("view.wordWrap"),
@@ -418,6 +420,19 @@ export function runMenuAction(id: string): void {
     case "alwaysOnTop":
       void s.toggleAlwaysOnTop();
       break;
+    case "nextTab":
+    case "prevTab": {
+      const tabs = s.tabs;
+      if (tabs.length < 2) break;
+      const idx = tabs.findIndex((t2) => t2.id === s.activeTabId);
+      const delta = id === "nextTab" ? 1 : -1;
+      const n = (idx + delta + tabs.length) % tabs.length;
+      if (tabs[n]) {
+        s.setActiveTab(tabs[n].id);
+        requestAnimationFrame(() => getEditorView()?.focus());
+      }
+      break;
+    }
     case "wordWrap":
       s.setSettings({ wordWrap: !s.settings.wordWrap });
       break;

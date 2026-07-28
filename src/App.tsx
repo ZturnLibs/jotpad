@@ -238,14 +238,47 @@ export function App() {
         s.setSettings({ zoom: 100 });
         return;
       }
+
+      // Tab switching: Ctrl+Tab, Ctrl+PageUp/Down, Cmd+Option+←/→ (mac), Mod+1..9
+      const switchTabBy = (delta: number) => {
+        if (s.tabs.length < 2) return;
+        const idx = s.tabs.findIndex((t2) => t2.id === s.activeTabId);
+        const n = (idx + delta + s.tabs.length) % s.tabs.length;
+        if (s.tabs[n]) {
+          s.setActiveTab(s.tabs[n].id);
+          requestAnimationFrame(() => getEditorView()?.focus());
+        }
+      };
+      const jumpTab = (oneBased: number) => {
+        if (!s.tabs.length) return;
+        const i = oneBased >= 9 ? s.tabs.length - 1 : oneBased - 1;
+        if (s.tabs[i]) {
+          s.setActiveTab(s.tabs[i].id);
+          requestAnimationFrame(() => getEditorView()?.focus());
+        }
+      };
+
       if (e.ctrlKey && e.key === "Tab") {
         eat();
-        const idx = s.tabs.findIndex((t2) => t2.id === s.activeTabId);
-        const dir = e.shiftKey ? -1 : 1;
-        const n = (idx + dir + s.tabs.length) % s.tabs.length;
-        if (s.tabs[n]) s.setActiveTab(s.tabs[n].id);
+        switchTabBy(e.shiftKey ? -1 : 1);
         return;
       }
+      if (e.ctrlKey && (e.key === "PageDown" || e.key === "PageUp")) {
+        eat();
+        switchTabBy(e.key === "PageDown" ? 1 : -1);
+        return;
+      }
+      if (isMac && mod && e.altKey && (e.key === "ArrowRight" || e.key === "ArrowLeft")) {
+        eat();
+        switchTabBy(e.key === "ArrowRight" ? 1 : -1);
+        return;
+      }
+      if (mod && !e.altKey && !e.shiftKey && /^[1-9]$/.test(e.key)) {
+        eat();
+        jumpTab(parseInt(e.key, 10));
+        return;
+      }
+
       if (e.key === "Escape") {
         if (
           s.quickOpenOpen ||

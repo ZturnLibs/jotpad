@@ -61,7 +61,7 @@ pnpm tauri build --debug --no-bundle
 | 保存 | `Ctrl+S` | `Cmd+S` |
 | 另存为 | `Ctrl+Shift+S` | `Cmd+Shift+S` |
 | 关闭标签页 | `Ctrl+W` | `Cmd+W` |
-| 切换标签 | `Ctrl+Tab` / `Ctrl+Shift+Tab` | `Ctrl+Tab` / `Ctrl+Shift+Tab` |
+| 切换标签 | `Ctrl+Tab` / `Ctrl+PageDown/Up` / `Ctrl+1…9` | `Ctrl+Tab` / `Cmd+Option+←/→` / `Cmd+1…9` |
 | 查找 | `Ctrl+F` | `Cmd+F` |
 | 替换 | `Ctrl+H` | `Cmd+Option+F` |
 | 查找下一个 / 上一个 | `F3` / `Shift+F3` | `F3` / `Shift+F3` |
