@@ -1,9 +1,24 @@
 // Native menu construction via Tauri's Builder API (macOS system menu bar,
 // Windows/Linux window menu bar). The frontend serializes a menu tree; Rust
 // rebuilds it and forwards clicks.
+//
+// Edit actions that the OS already implements (cut/copy/paste/selectAll) must
+// use PredefinedMenuItem so accelerators go through the webview responder
+// chain instead of the async Web Clipboard API (which shows a "Paste" prompt).
 use serde::Deserialize;
-use tauri::menu::{CheckMenuItemBuilder, MenuItemBuilder, MenuBuilder, SubmenuBuilder};
+use tauri::menu::{
+    CheckMenuItemBuilder, MenuBuilder, MenuItemBuilder, PredefinedMenuItem, SubmenuBuilder,
+};
 use tauri::{AppHandle, Emitter, Manager, Runtime};
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum PredefinedKind {
+    Cut,
+    Copy,
+    Paste,
+    SelectAll,
+}
 
 #[derive(Deserialize)]
 #[serde(tag = "type", rename_all = "lowercase")]
@@ -15,6 +30,11 @@ pub enum MenuNode {
         accel: Option<String>,
         #[serde(default = "default_true")]
         enabled: bool,
+    },
+    /// OS/Tauri built-in edit actions (native clipboard + first-responder).
+    Predefined {
+        item: PredefinedKind,
+        text: Option<String>,
     },
     Check {
         id: String,
@@ -49,6 +69,16 @@ fn build_submenu<R: Runtime, M: Manager<R>>(
         match node {
             MenuNode::Separator => {
                 b = b.separator();
+            }
+            MenuNode::Predefined { item, text } => {
+                let label = text.as_deref();
+                let predefined = match item {
+                    PredefinedKind::Cut => PredefinedMenuItem::cut(app, label)?,
+                    PredefinedKind::Copy => PredefinedMenuItem::copy(app, label)?,
+                    PredefinedKind::Paste => PredefinedMenuItem::paste(app, label)?,
+                    PredefinedKind::SelectAll => PredefinedMenuItem::select_all(app, label)?,
+                };
+                b = b.item(&predefined);
             }
             MenuNode::Item {
                 id,
@@ -144,6 +174,13 @@ fn item(id: &str, text: &str, accel: Option<&str>) -> MenuNode {
     }
 }
 
+fn predefined(kind: PredefinedKind, text: &str) -> MenuNode {
+    MenuNode::Predefined {
+        item: kind,
+        text: Some(text.to_string()),
+    }
+}
+
 fn check(id: &str, text: &str, checked: bool) -> MenuNode {
     MenuNode::Check {
         id: id.to_string(),
@@ -192,13 +229,15 @@ pub fn default_menu<R: Runtime, M: Manager<R>>(
         text: "编辑".to_string(),
         enabled: true,
         items: vec![
+            // Undo/redo stay custom: CodeMirror owns its history stack.
             item("undo", "撤销", Some("CmdOrCtrl+Z")),
             item("redo", "重做", Some("CmdOrCtrl+Y")),
             SEP,
-            item("cut", "剪切", Some("CmdOrCtrl+X")),
-            item("copy", "复制", Some("CmdOrCtrl+C")),
-            item("paste", "粘贴", Some("CmdOrCtrl+V")),
-            item("delete", "删除", Some("Delete")),
+            predefined(PredefinedKind::Cut, "剪切"),
+            predefined(PredefinedKind::Copy, "复制"),
+            predefined(PredefinedKind::Paste, "粘贴"),
+            // No Delete accelerator — let the editor handle the key natively.
+            item("delete", "删除", None),
             SEP,
             item("find", "查找…", Some("CmdOrCtrl+F")),
             item("findNext", "查找下一个", Some("F3")),
@@ -206,7 +245,7 @@ pub fn default_menu<R: Runtime, M: Manager<R>>(
             item("replace", "替换…", Some("CmdOrCtrl+H")),
             item("goto", "转到…", Some("CmdOrCtrl+G")),
             SEP,
-            item("selectAll", "全选", Some("CmdOrCtrl+A")),
+            predefined(PredefinedKind::SelectAll, "全选"),
             item("timeDate", "时间/日期", Some("F5")),
         ],
     };

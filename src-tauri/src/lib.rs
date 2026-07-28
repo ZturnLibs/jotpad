@@ -1,5 +1,6 @@
 // Jotpad backend: multi-encoding file I/O + persistent state (drafts/settings/recents).
 mod menu;
+mod shell_integration;
 
 use encoding_rs::{BIG5, EUC_KR, GBK, SHIFT_JIS, UTF_8, UTF_16BE, UTF_16LE, WINDOWS_1252, Encoding};
 use serde::Serialize;
@@ -231,6 +232,22 @@ fn set_app_menu(
     })
 }
 
+/// Read clipboard text via the OS clipboard (avoids WebView Clipboard API prompts).
+#[tauri::command]
+fn clipboard_read_text() -> Result<String, String> {
+    arboard::Clipboard::new()
+        .and_then(|mut c| c.get_text())
+        .map_err(|e| e.to_string())
+}
+
+/// Write clipboard text via the OS clipboard.
+#[tauri::command]
+fn clipboard_write_text(text: String) -> Result<(), String> {
+    arboard::Clipboard::new()
+        .and_then(|mut c| c.set_text(text))
+        .map_err(|e| e.to_string())
+}
+
 /// Best-effort system accent color as [r, g, b].
 #[tauri::command]
 fn get_system_accent() -> [u8; 3] {
@@ -264,7 +281,7 @@ fn system_accent() -> [u8; 3] {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let app = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
@@ -275,7 +292,13 @@ pub fn run() {
             read_state,
             write_state,
             set_app_menu,
-            get_system_accent
+            clipboard_read_text,
+            clipboard_write_text,
+            get_system_accent,
+            shell_integration::take_pending_open_paths,
+            shell_integration::shell_integration_status,
+            shell_integration::set_shell_new_text_file,
+            shell_integration::set_shell_open_with,
         ])
         .on_menu_event(|app, event| menu::handle_event(app, event))
         .setup(|app| {
@@ -283,8 +306,26 @@ pub fn run() {
             let menu = menu::default_menu(app)?;
             app.set_menu(menu)?;
             eprintln!("[menu] startup app menu set");
+
+            // Windows / Linux (and macOS argv fallback): open files from launch args.
+            let launch = shell_integration::collect_launch_paths();
+            if !launch.is_empty() {
+                shell_integration::enqueue_open_paths(app.handle(), launch);
+            }
             Ok(())
         })
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application");
+
+    app.run(|app, event| {
+        #[cfg(any(target_os = "macos", target_os = "ios"))]
+        if let tauri::RunEvent::Opened { urls } = event {
+            let files: Vec<String> = urls
+                .into_iter()
+                .filter_map(|url| url.to_file_path().ok())
+                .map(|p| p.to_string_lossy().into_owned())
+                .collect();
+            shell_integration::enqueue_open_paths(app, files);
+        }
+    });
 }

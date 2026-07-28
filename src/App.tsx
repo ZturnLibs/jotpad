@@ -1,8 +1,9 @@
 import { useEffect } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { listen } from "@tauri-apps/api/event";
 import { useStore } from "@/store/useStore";
 import { useT } from "@/lib/i18n";
-import { basename, getSystemAccent } from "@/lib/backend";
+import { basename, getSystemAccent, takePendingOpenPaths } from "@/lib/backend";
 import { clamp, darken, lighten, platform, rgbToHex } from "@/lib/utils";
 import { getEditorView } from "@/lib/editorRef";
 import { insertAtCursor, timeDateString } from "@/lib/edit";
@@ -282,6 +283,41 @@ export function App() {
       document.removeEventListener("drop", prevent);
     };
   }, []);
+
+  // Open With / argv / Finder service: paths from the native shell.
+  useEffect(() => {
+    if (!ready) return;
+    let cancelled = false;
+    let unlisten: (() => void) | undefined;
+
+    const openAll = (paths: string[]) => {
+      for (const p of paths) {
+        void useStore.getState().openPath(p);
+      }
+    };
+
+    void (async () => {
+      try {
+        // Listen first so runtime Opened events are not missed, then drain cold-start queue.
+        unlisten = await listen<string[]>("open-paths", (e) => {
+          if (Array.isArray(e.payload) && e.payload.length) openAll(e.payload);
+        });
+      } catch {
+        /* ignore */
+      }
+      try {
+        const pending = await takePendingOpenPaths();
+        if (!cancelled && pending.length) openAll(pending);
+      } catch {
+        /* ignore */
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      unlisten?.();
+    };
+  }, [ready]);
 
   if (!ready) {
     return (

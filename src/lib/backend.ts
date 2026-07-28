@@ -121,3 +121,26 @@ export function joinPath(dir: string, name: string): string {
   const sep = dir.includes("\\") && !dir.includes("/") ? "\\" : "/";
   return dir.endsWith("/") || dir.endsWith("\\") ? `${dir}${name}` : `${dir}${sep}${name}`;
 }
+
+export interface ShellIntegrationStatus {
+  newTextFile: boolean;
+  openWith: boolean;
+  platform: string;
+}
+
+export function shellIntegrationStatus(): Promise<ShellIntegrationStatus> {
+  return invoke<ShellIntegrationStatus>("shell_integration_status");
+}
+
+export function setShellNewTextFile(enabled: boolean): Promise<void> {
+  return invoke<void>("set_shell_new_text_file", { enabled });
+}
+
+export function setShellOpenWith(enabled: boolean): Promise<void> {
+  return invoke<void>("set_shell_open_with", { enabled });
+}
+
+/** Drain file paths queued before the UI was ready (Open With / argv). */
+export function takePendingOpenPaths(): Promise<string[]> {
+  return invoke<string[]>("take_pending_open_paths");
+}

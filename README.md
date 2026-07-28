@@ -13,6 +13,7 @@ Jotpad 是一款用 **Tauri 2 + React + TypeScript + CodeMirror 6** 构建的跨
 - 原生系统菜单（各平台 `muda` / `AppHandle::set_menu`）
 - 中文 / English 界面
 - 完整快捷键、拖拽打开文件、打印与页面设置
+- 可选系统集成：右键「新建文本文件」、使用 Jotpad 打开文本文件
 
 ## 开发
 

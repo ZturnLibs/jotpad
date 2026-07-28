@@ -776,6 +776,14 @@ textarea {
 .settings-toggle {
   padding: 0 6px;
 }
+.settings-hint {
+  margin: 4px 0 8px;
+  font-size: 12px;
+  line-height: 1.4;
+}
+.settings-error {
+  color: var(--danger, #c42b1c);
+}
 .settings .dialog-actions {
   margin-top: 14px;
   flex-shrink: 0;

@@ -144,6 +144,11 @@ const zhCN: Dict = {
   "settings.lineNumbers": "显示行号",
   "settings.accent": "强调色",
   "settings.done": "完成",
+  "settings.system": "系统集成",
+  "settings.shellNewTextFile": "在右键菜单中显示「新建文本文件」",
+  "settings.shellOpenWith": "使用 Jotpad 打开文本文件",
+  "settings.shellHint": "启用后会出现在 Finder / 资源管理器右键菜单；完整「打开方式」需安装版应用。",
+  "settings.shellError": "无法更新系统集成，请检查权限后重试",
 
   // Misc
   "misc.emptyHint": "新建一个标签页开始编写",
@@ -279,6 +284,11 @@ const en: Dict = {
   "settings.lineNumbers": "Show line numbers",
   "settings.accent": "Accent color",
   "settings.done": "Done",
+  "settings.system": "System integration",
+  "settings.shellNewTextFile": "Show “New Text File” in context menu",
+  "settings.shellOpenWith": "Open text files with Jotpad",
+  "settings.shellHint": "Adds Finder / Explorer context-menu items. Full “Open With” needs an installed build.",
+  "settings.shellError": "Could not update system integration. Check permissions and try again.",
 
   "misc.emptyHint": "Create a new tab to start writing",
   "misc.about": "About Jotpad",

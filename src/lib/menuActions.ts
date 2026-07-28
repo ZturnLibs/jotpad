@@ -34,6 +34,12 @@ export interface MenuItemModel {
   shortcut?: string;
   /** Native accelerator (e.g. "CommandOrControl+N"). */
   accel?: string;
+  /**
+   * Use Tauri/OS PredefinedMenuItem instead of a custom click handler.
+   * Needed for cut/copy/paste/selectAll so Cmd/Ctrl+V etc. hit the webview
+   * responder chain (no Web Clipboard "Paste" prompt).
+   */
+  predefined?: "cut" | "copy" | "paste" | "selectAll";
   checked?: boolean;
   disabled?: boolean;
   sep?: boolean;
@@ -168,10 +174,12 @@ export function getMenuModel(): MenuModel {
       accel: isMac ? A("Shift+Z") : A("Y"),
     },
     { sep: true },
-    { id: "cut", label: t("edit.cut"), shortcut: `${MOD}+X`, accel: A("X") },
-    { id: "copy", label: t("edit.copy"), shortcut: `${MOD}+C`, accel: A("C") },
-    { id: "paste", label: t("edit.paste"), shortcut: `${MOD}+V`, accel: A("V") },
-    { id: "delete", label: t("edit.delete"), shortcut: "Del", accel: "Delete" },
+    // Native predefined items: OS owns accelerators + clipboard.
+    { id: "cut", predefined: "cut", label: t("edit.cut"), shortcut: `${MOD}+X` },
+    { id: "copy", predefined: "copy", label: t("edit.copy"), shortcut: `${MOD}+C` },
+    { id: "paste", predefined: "paste", label: t("edit.paste"), shortcut: `${MOD}+V` },
+    // No accelerator — Delete must reach the editor's native keymap.
+    { id: "delete", label: t("edit.delete"), shortcut: "Del" },
     { sep: true },
     { id: "find", label: t("edit.find"), shortcut: `${MOD}+F`, accel: A("F") },
     { id: "findNext", label: t("edit.findNext"), shortcut: "F3", accel: "F3" },
@@ -184,7 +192,12 @@ export function getMenuModel(): MenuModel {
     },
     { id: "goto", label: t("edit.goto"), shortcut: `${MOD}+G`, accel: A("G") },
     { sep: true },
-    { id: "selectAll", label: t("edit.selectAll"), shortcut: `${MOD}+A`, accel: A("A") },
+    {
+      id: "selectAll",
+      predefined: "selectAll",
+      label: t("edit.selectAll"),
+      shortcut: `${MOD}+A`,
+    },
     { id: "timeDate", label: t("edit.timeDate"), shortcut: "F5", accel: "F5" },
   ];
 

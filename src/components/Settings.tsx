@@ -3,6 +3,7 @@ import { useStore } from "@/store/useStore";
 import { useT } from "@/lib/i18n";
 import { ACCENT_PRESETS, FONT_PRESETS, type Locale, type ThemeMode } from "@/types";
 import { clamp } from "@/lib/utils";
+import * as api from "@/lib/backend";
 
 type SettingsTab = "appearance" | "editor" | "general";
 
@@ -41,13 +42,27 @@ function Segmented<T extends string>({
   );
 }
 
-function Toggle({ on, onChange, label }: { on: boolean; onChange: (v: boolean) => void; label: string }) {
+function Toggle({
+  on,
+  onChange,
+  label,
+  disabled,
+}: {
+  on: boolean;
+  onChange: (v: boolean) => void;
+  label: string;
+  disabled?: boolean;
+}) {
   return (
-    <label className="menu-row settings-toggle" style={{ cursor: "pointer", borderRadius: 6 }}>
+    <label
+      className="menu-row settings-toggle"
+      style={{ cursor: disabled ? "default" : "pointer", borderRadius: 6, opacity: disabled ? 0.6 : 1 }}
+    >
       <span className="label">{label}</span>
       <input
         type="checkbox"
         checked={on}
+        disabled={disabled}
         onChange={(e) => onChange(e.target.checked)}
         style={{ width: 16, height: 16 }}
       />
@@ -62,10 +77,59 @@ export function Settings() {
   const setSettings = useStore((s) => s.setSettings);
   const t = useT();
   const [tab, setTab] = useState<SettingsTab>("appearance");
+  const [shellNew, setShellNew] = useState(false);
+  const [shellOpen, setShellOpen] = useState(false);
+  const [shellBusy, setShellBusy] = useState(false);
+  const [shellError, setShellError] = useState<string | null>(null);
 
   useEffect(() => {
     if (open) setTab("appearance");
   }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const status = await api.shellIntegrationStatus();
+        if (cancelled) return;
+        setShellNew(status.newTextFile);
+        setShellOpen(status.openWith);
+        setShellError(null);
+      } catch {
+        if (!cancelled) setShellError(t("settings.shellError"));
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, t]);
+
+  async function toggleShellNew(v: boolean) {
+    setShellBusy(true);
+    setShellError(null);
+    try {
+      await api.setShellNewTextFile(v);
+      setShellNew(v);
+    } catch {
+      setShellError(t("settings.shellError"));
+    } finally {
+      setShellBusy(false);
+    }
+  }
+
+  async function toggleShellOpen(v: boolean) {
+    setShellBusy(true);
+    setShellError(null);
+    try {
+      await api.setShellOpenWith(v);
+      setShellOpen(v);
+    } catch {
+      setShellError(t("settings.shellError"));
+    } finally {
+      setShellBusy(false);
+    }
+  }
 
   if (!open) return null;
 
@@ -187,6 +251,25 @@ export function Settings() {
                     onChange={(v) => setSettings({ showStatusBar: v })}
                     label={t("settings.showStatusBar")}
                   />
+                </div>
+                <div className="field" style={{ marginTop: 12 }}>
+                  <label>{t("settings.system")}</label>
+                  <p className="settings-hint muted">{t("settings.shellHint")}</p>
+                  <div className="settings-toggles">
+                    <Toggle
+                      on={shellNew}
+                      onChange={(v) => void toggleShellNew(v)}
+                      label={t("settings.shellNewTextFile")}
+                      disabled={shellBusy}
+                    />
+                    <Toggle
+                      on={shellOpen}
+                      onChange={(v) => void toggleShellOpen(v)}
+                      label={t("settings.shellOpenWith")}
+                      disabled={shellBusy}
+                    />
+                  </div>
+                  {shellError && <p className="settings-hint settings-error">{shellError}</p>}
                 </div>
               </>
             )}

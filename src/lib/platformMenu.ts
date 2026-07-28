@@ -7,12 +7,14 @@ import { platform } from "@/lib/utils";
 import { getMenuModel, runMenuAction, type MenuItemModel } from "@/lib/menuActions";
 
 interface MenuDef {
-  type: "item" | "check" | "separator" | "submenu";
+  type: "item" | "check" | "separator" | "submenu" | "predefined";
   id?: string;
   text?: string;
   accelerator?: string;
   checked?: boolean;
   enabled?: boolean;
+  /** OS built-in: cut | copy | paste | selectAll */
+  item?: string;
   items?: MenuDef[];
 }
 
@@ -25,6 +27,13 @@ function toDefs(items: MenuItemModel[]): MenuDef[] {
         text: it.label,
         enabled: it.disabled !== true,
         items: toDefs(it.submenu),
+      };
+    }
+    if (it.predefined) {
+      return {
+        type: "predefined",
+        item: it.predefined,
+        text: it.label,
       };
     }
     if (it.checked !== undefined) {

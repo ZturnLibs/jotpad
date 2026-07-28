@@ -38,6 +38,16 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
+    ],
+    "fileAssociations": [
+      {
+        "ext": ["txt", "text", "log", "md", "markdown", "csv", "json", "xml", "yaml", "yml", "toml", "ini", "cfg", "conf"],
+        "name": "Text Document",
+        "description": "Text Document",
+        "role": "Editor",
+        "mimeType": "text/plain",
+        "rank": "Default"
+      }
     ]
   }
 }
