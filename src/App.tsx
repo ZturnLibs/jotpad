@@ -20,7 +20,7 @@ import { ContextMenu } from "@/components/ContextMenu";
 import { PageSetup } from "@/components/PageSetup";
 import { QuickOpen } from "@/components/QuickOpen";
 import { About, ConfirmDialog, GotoDialog, ReloadDialog, SessionNameDialog } from "@/components/Dialogs";
-import { UpdateDialog } from "@/components/UpdateDialog";
+import { ToastHost } from "@/components/ToastHost";
 
 function applyTheme(mode: "light" | "dark" | "system") {
   const effective =
@@ -330,7 +330,7 @@ export function App() {
       <PageSetup />
       <Settings />
       <About />
-      <UpdateDialog />
+      <ToastHost />
     </div>
   );
 }

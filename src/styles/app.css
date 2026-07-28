@@ -1012,19 +1012,105 @@ textarea {
 /* ---------- Toast ---------- */
 .toast-wrap {
   position: fixed;
-  bottom: 40px;
-  left: 50%;
-  transform: translateX(-50%);
+  right: 16px;
+  bottom: 48px;
+  left: auto;
+  transform: none;
   z-index: 300;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-end;
+  max-width: min(360px, calc(100vw - 32px));
+  pointer-events: none;
 }
 .toast {
+  pointer-events: auto;
+  width: 100%;
   background: var(--bg-elevated);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius);
   box-shadow: var(--shadow-pop);
-  padding: 10px 18px;
+  padding: 12px 14px;
   font-size: 13px;
   animation: pop 140ms ease;
+}
+.toast-error {
+  border-color: color-mix(in srgb, #c42b1c 45%, var(--border-strong));
+}
+.toast-success {
+  border-color: color-mix(in srgb, #107c10 40%, var(--border-strong));
+}
+.toast-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.toast-title {
+  flex: 1;
+  font-weight: 600;
+  line-height: 1.35;
+}
+.toast-close {
+  flex-shrink: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 2px;
+  border-radius: 4px;
+}
+.toast-close:hover {
+  color: var(--text);
+  background: var(--bg-hover, transparent);
+}
+.toast-body {
+  margin: 6px 0 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  max-height: 96px;
+  overflow: auto;
+}
+.toast-progress {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--border);
+  margin-top: 10px;
+  overflow: hidden;
+}
+.toast-progress-bar {
+  height: 100%;
+  background: var(--accent, #0067c0);
+  transition: width 0.15s ease;
+}
+.toast-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  margin-top: 10px;
+  justify-content: flex-end;
+}
+.toast-btn {
+  padding: 4px 10px;
+  font-size: 12px;
+}
+.toast-link {
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 4px 6px;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.toast-link:hover {
+  color: var(--text);
 }
 
 /* utility */
@@ -1071,27 +1157,4 @@ textarea {
 .about-actions {
   justify-content: center;
   flex-wrap: wrap;
-}
-
-/* ---------- Update dialog ---------- */
-.update-dialog {
-  min-width: 320px;
-  max-width: 440px;
-}
-.update-notes {
-  white-space: pre-wrap;
-  max-height: 180px;
-  overflow: auto;
-}
-.update-progress {
-  height: 6px;
-  border-radius: 3px;
-  background: var(--border);
-  margin: 4px 0 12px;
-  overflow: hidden;
-}
-.update-progress-bar {
-  height: 100%;
-  background: var(--accent, #0067c0);
-  transition: width 0.15s ease;
 }

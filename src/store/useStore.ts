@@ -16,12 +16,17 @@ import { DEFAULT_SETTINGS } from "@/types";
 import * as api from "@/lib/backend";
 import { basename, dirname, joinPath } from "@/lib/backend";
 import { getEditorView } from "@/lib/editorRef";
+import { translate } from "@/lib/i18n";
+import { dismissToast, showToast, updateToast } from "@/lib/toast";
 import {
+  UPDATE_TOAST_ID,
   checkForAppUpdate,
   discardPendingUpdate,
-  downloadAndInstallPending,
+  downloadPending,
+  getCanInstallInApp,
+  getPendingUpdateVersion,
+  installPending,
   openReleasesPage,
-  relaunchApp,
 } from "@/lib/updater";
 
 const STATE_VERSION = 2;
@@ -35,38 +40,6 @@ interface ConfirmState {
   tabIds: string[];
   sessionId?: string;
 }
-
-export type UpdatePhase =
-  | "idle"
-  | "checking"
-  | "available"
-  | "upToDate"
-  | "downloading"
-  | "error";
-
-export interface UpdateUiState {
-  open: boolean;
-  phase: UpdatePhase;
-  manual: boolean;
-  version: string | null;
-  notes: string | null;
-  skipped: boolean;
-  canInstallInApp: boolean;
-  progress: number | null;
-  error: string | null;
-}
-
-const IDLE_UPDATE_UI: UpdateUiState = {
-  open: false,
-  phase: "idle",
-  manual: false,
-  version: null,
-  notes: null,
-  skipped: false,
-  canInstallInApp: true,
-  progress: null,
-  error: null,
-};
 
 interface ReloadPrompt {
   tabId: string;
@@ -102,9 +75,6 @@ interface Store {
   voiceSetupOpen: boolean;
   /** 打开设置时定位到语音区块。 */
   settingsFocus: "voice" | null;
-
-  /** 应用内更新对话框状态（不持久化）。 */
-  updateUi: UpdateUiState;
 
   // Derived
   activeTab: () => TabState | undefined;
@@ -168,12 +138,11 @@ interface Store {
   /** 菜单/快捷键入口：未就绪则引导下载，就绪则开录音条。 */
   requestVoiceDictation: () => Promise<void>;
 
-  /** 检查更新；manual 时总是展示结果对话框。 */
+  /** 检查更新；结果以右下角 Toast 展示（不阻塞编辑）。 */
   checkForUpdates: (opts?: { manual?: boolean }) => Promise<void>;
-  dismissUpdateDialog: () => void;
   skipPendingUpdate: () => Promise<void>;
   installPendingUpdate: () => Promise<void>;
-  /** 已处理未保存确认后的实际下载安装。 */
+  /** 已处理未保存确认后的实际安装重启。 */
   proceedInstallUpdate: () => Promise<void>;
   openUpdateDownloadPage: () => Promise<void>;
 
@@ -316,7 +285,6 @@ export const useStore = create<Store>((set, get) => ({
   voiceOpen: false,
   voiceSetupOpen: false,
   settingsFocus: null,
-  updateUi: { ...IDLE_UPDATE_UI },
 
   activeTab: () => {
     const { tabs, activeTabId } = get();
@@ -901,71 +869,141 @@ export const useStore = create<Store>((set, get) => ({
 
   checkForUpdates: async (opts) => {
     const manual = !!opts?.manual;
+    const locale = get().settings.locale;
+    const t = (key: string, params?: Record<string, string | number>) =>
+      translate(locale, key, params);
     const skippedVersion = get().settings.skippedUpdateVersion;
-    set({
-      updateUi: {
-        ...IDLE_UPDATE_UI,
-        open: manual,
-        phase: "checking",
-        manual,
-      },
-      aboutOpen: manual ? false : get().aboutOpen,
+
+    if (manual) set({ aboutOpen: false });
+
+    showToast({
+      id: UPDATE_TOAST_ID,
+      title: t("update.checking"),
+      dismissible: false,
+      durationMs: null,
+      progress: null,
     });
+
     const result = await checkForAppUpdate({ skippedVersion });
+
     if (result.status === "upToDate") {
       if (manual) {
-        set({
-          updateUi: { ...IDLE_UPDATE_UI, open: true, phase: "upToDate", manual: true },
+        showToast({
+          id: UPDATE_TOAST_ID,
+          title: t("update.upToDate"),
+          variant: "success",
+          dismissible: true,
+          durationMs: 3000,
         });
       } else {
-        set({ updateUi: { ...IDLE_UPDATE_UI } });
+        dismissToast(UPDATE_TOAST_ID);
       }
       return;
     }
+
     if (result.status === "error") {
       if (manual) {
-        set({
-          updateUi: {
-            ...IDLE_UPDATE_UI,
-            open: true,
-            phase: "error",
-            manual: true,
-            error: result.message,
-          },
+        showToast({
+          id: UPDATE_TOAST_ID,
+          title: t("update.title"),
+          body: result.message || t("update.checkFailed"),
+          variant: "error",
+          dismissible: true,
+          durationMs: null,
+          actions: [
+            {
+              id: "open",
+              label: t("update.openDownload"),
+              onClick: () => void get().openUpdateDownloadPage(),
+            },
+          ],
         });
       } else {
-        set({ updateUi: { ...IDLE_UPDATE_UI } });
+        dismissToast(UPDATE_TOAST_ID);
       }
       return;
     }
-    // available
+
     if (!manual && result.skipped) {
       await discardPendingUpdate();
-      set({ updateUi: { ...IDLE_UPDATE_UI } });
+      dismissToast(UPDATE_TOAST_ID);
       return;
     }
-    set({
-      updateUi: {
-        open: true,
-        phase: "available",
-        manual,
-        version: result.version,
-        notes: result.notes,
-        skipped: result.skipped,
-        canInstallInApp: result.canInstallInApp,
-        progress: null,
-        error: null,
-      },
-    });
-  },
 
-  dismissUpdateDialog: () => {
-    void discardPendingUpdate();
-    set({ updateUi: { ...IDLE_UPDATE_UI } });
+    if (result.status === "ready") {
+      showReadyUpdateToast(get, result.version, result.notes, result.canInstallInApp, result.skipped);
+      return;
+    }
+
+    // available → 自动下载
+    if (!result.canInstallInApp) {
+      showToast({
+        id: UPDATE_TOAST_ID,
+        title: t("update.availableTitle", { version: result.version }),
+        body: [result.notes?.trim(), t("update.linuxManualHint")].filter(Boolean).join("\n\n"),
+        dismissible: true,
+        durationMs: null,
+        actions: [
+          {
+            id: "skip",
+            label: t("update.skip"),
+            quiet: true,
+            onClick: () => void get().skipPendingUpdate(),
+          },
+          {
+            id: "open",
+            label: t("update.openDownload"),
+            primary: true,
+            onClick: () => void get().openUpdateDownloadPage(),
+          },
+        ],
+      });
+      return;
+    }
+
+    showToast({
+      id: UPDATE_TOAST_ID,
+      title: t("update.downloadingTitle", { version: result.version }),
+      body: t("update.downloading"),
+      dismissible: false,
+      durationMs: null,
+      progress: null,
+    });
+
+    try {
+      await downloadPending((pct) => {
+        updateToast(UPDATE_TOAST_ID, {
+          title: t("update.downloadingTitle", { version: result.version }),
+          body:
+            pct == null
+              ? t("update.downloading")
+              : t("update.downloadingPct", { pct: String(pct) }),
+          progress: pct,
+          dismissible: false,
+        });
+      });
+      showReadyUpdateToast(get, result.version, result.notes, true, result.skipped);
+    } catch (e) {
+      showToast({
+        id: UPDATE_TOAST_ID,
+        title: t("update.title"),
+        body: e instanceof Error ? e.message : String(e),
+        variant: "error",
+        dismissible: true,
+        durationMs: null,
+        actions: [
+          {
+            id: "open",
+            label: t("update.openDownload"),
+            onClick: () => void get().openUpdateDownloadPage(),
+          },
+        ],
+      });
+    }
   },
 
   skipPendingUpdate: async () => {
-    const ver = get().updateUi.version;
+    const ver = getPendingUpdateVersion();
     if (ver) {
       set((s) => ({
         settings: { ...s.settings, skippedUpdateVersion: ver },
@@ -973,11 +1011,11 @@ export const useStore = create<Store>((set, get) => ({
       void get().persist();
     }
     await discardPendingUpdate();
-    set({ updateUi: { ...IDLE_UPDATE_UI } });
+    dismissToast(UPDATE_TOAST_ID);
   },
 
   installPendingUpdate: async () => {
-    if (!get().updateUi.canInstallInApp) {
+    if (!getCanInstallInApp()) {
       await get().openUpdateDownloadPage();
       return;
     }
@@ -992,29 +1030,42 @@ export const useStore = create<Store>((set, get) => ({
   },
 
   proceedInstallUpdate: async () => {
-    set((s) => ({
-      updateUi: { ...s.updateUi, open: true, phase: "downloading", progress: null, error: null },
-    }));
+    const locale = get().settings.locale;
+    const t = (key: string, params?: Record<string, string | number>) =>
+      translate(locale, key, params);
+    const ver = getPendingUpdateVersion() || "";
+    showToast({
+      id: UPDATE_TOAST_ID,
+      title: t("update.installingTitle", { version: ver }),
+      body: t("update.installing"),
+      dismissible: false,
+      durationMs: null,
+      progress: null,
+    });
     try {
       await get().persist();
-      await downloadAndInstallPending((pct) => {
-        set((s) => ({ updateUi: { ...s.updateUi, progress: pct } }));
-      });
-      // 清除跳过标记，避免升版后仍记住旧 skip
       set((s) => ({
         settings: { ...s.settings, skippedUpdateVersion: null },
       }));
       await get().persist();
-      await relaunchApp();
+      await installPending();
     } catch (e) {
-      set((s) => ({
-        updateUi: {
-          ...s.updateUi,
-          open: true,
-          phase: "error",
-          error: e instanceof Error ? e.message : String(e),
-        },
-      }));
+      showToast({
+        id: UPDATE_TOAST_ID,
+        title: t("update.title"),
+        body: e instanceof Error ? e.message : String(e),
+        variant: "error",
+        dismissible: true,
+        durationMs: null,
+        actions: [
+          {
+            id: "retry",
+            label: t("update.install"),
+            primary: true,
+            onClick: () => void get().installPendingUpdate(),
+          },
+        ],
+      });
     }
   },
 
@@ -1042,3 +1093,50 @@ export const useStore = create<Store>((set, get) => ({
     }
   },
 }));
+
+type StoreGet = () => Store;
+
+function showReadyUpdateToast(
+  get: StoreGet,
+  version: string,
+  notes: string | null,
+  canInstallInApp: boolean,
+  skipped: boolean,
+) {
+  const locale = get().settings.locale;
+  const t = (key: string, params?: Record<string, string | number>) =>
+    translate(locale, key, params);
+  let body = notes?.trim() || t("update.readyBody", { version });
+  if (skipped) body = `${t("update.skippedHint")}\n\n${body}`;
+  if (!canInstallInApp) body = `${body}\n\n${t("update.linuxManualHint")}`;
+
+  showToast({
+    id: UPDATE_TOAST_ID,
+    title: t("update.readyTitle", { version }),
+    body,
+    variant: "success",
+    dismissible: true,
+    durationMs: null,
+    actions: [
+      {
+        id: "skip",
+        label: t("update.skip"),
+        quiet: true,
+        onClick: () => void get().skipPendingUpdate(),
+      },
+      canInstallInApp
+        ? {
+            id: "install",
+            label: t("update.install"),
+            primary: true,
+            onClick: () => void get().installPendingUpdate(),
+          }
+        : {
+            id: "open",
+            label: t("update.openDownload"),
+            primary: true,
+            onClick: () => void get().openUpdateDownloadPage(),
+          },
+    ],
+  });
+}
