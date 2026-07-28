@@ -27,7 +27,9 @@ export function ConfirmDialog() {
   const msg =
     confirm.kind === "exit"
       ? t("dialog.confirmExitMsg")
-      : t("dialog.saveChangesMsg", { name });
+      : confirm.kind === "openSession"
+        ? t("dialog.openSessionMsg")
+        : t("dialog.saveChangesMsg", { name });
 
   return (
     <div
@@ -140,6 +142,62 @@ export function GotoDialog() {
           </button>
           <button className="btn primary" onClick={go}>
             {t("goto.title")}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Name a session from the currently open on-disk files. */
+export function SessionNameDialog() {
+  const open = useStore((s) => s.sessionNameOpen);
+  const setOpen = useStore((s) => s.setSessionNameOpen);
+  const saveSession = useStore((s) => s.saveSession);
+  const t = useT();
+  const [name, setName] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (open) {
+      setName("");
+      requestAnimationFrame(() => inputRef.current?.focus());
+    }
+  }, [open]);
+
+  if (!open) return null;
+
+  const submit = () => {
+    void saveSession(name);
+  };
+
+  return (
+    <div
+      className="overlay"
+      onMouseDown={(e) => e.target === e.currentTarget && setOpen(false)}
+    >
+      <div className="dialog" style={{ minWidth: 360 }}>
+        <h3>{t("dialog.sessionNameTitle")}</h3>
+        <div className="field">
+          <label>{t("dialog.sessionNameLabel")}</label>
+          <input
+            ref={inputRef}
+            type="text"
+            value={name}
+            placeholder={t("dialog.sessionNamePlaceholder")}
+            onChange={(e) => setName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") submit();
+              if (e.key === "Escape") setOpen(false);
+            }}
+          />
+        </div>
+        <div className="dialog-actions">
+          <button className="btn" onClick={() => setOpen(false)}>
+            {t("dialog.cancel")}
+          </button>
+          <button className="btn primary" onClick={submit} disabled={!name.trim()}>
+            {t("dialog.sessionSave")}
           </button>
         </div>
       </div>

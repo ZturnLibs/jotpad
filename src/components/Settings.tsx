@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useStore } from "@/store/useStore";
 import { useT } from "@/lib/i18n";
-import { ACCENT_PRESETS, FONT_PRESETS, type Locale, type ThemeMode } from "@/types";
+import { ACCENT_PRESETS, FONT_PRESETS, type Locale, type StartupMode, type ThemeMode } from "@/types";
 import { clamp } from "@/lib/utils";
 import * as api from "@/lib/backend";
 
@@ -242,7 +242,13 @@ export function Settings() {
                     onChange={(v) => setSettings({ showLineNumbers: v })}
                     label={t("settings.lineNumbers")}
                   />
+                  <Toggle
+                    on={settings.spellCheck}
+                    onChange={(v) => setSettings({ spellCheck: v })}
+                    label={t("settings.spellCheck")}
+                  />
                 </div>
+                <p className="settings-hint muted">{t("settings.spellCheckHint")}</p>
               </>
             )}
 
@@ -265,6 +271,18 @@ export function Settings() {
                     onChange={(v) => setSettings({ showStatusBar: v })}
                     label={t("settings.showStatusBar")}
                   />
+                </div>
+                <div className="field" style={{ marginTop: 12 }}>
+                  <label>{t("settings.startup")}</label>
+                  <Segmented<StartupMode>
+                    value={settings.startupMode}
+                    onChange={(v) => setSettings({ startupMode: v })}
+                    options={[
+                      { value: "restore", label: t("settings.startupRestore") },
+                      { value: "blank", label: t("settings.startupBlank") },
+                    ]}
+                  />
+                  <p className="settings-hint muted">{t("settings.startupHint")}</p>
                 </div>
                 <div className="field" style={{ marginTop: 12 }}>
                   <label>{t("settings.system")}</label>

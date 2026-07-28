@@ -13,11 +13,18 @@ import { findNext, findPrevious, search } from "@codemirror/search";
 import { useStore } from "@/store/useStore";
 import { emitEditorInfo, setEditorView, viewInfo } from "@/lib/editorRef";
 
+function spellcheckExt(on: boolean) {
+  return EditorView.contentAttributes.of({
+    spellcheck: on ? "true" : "false",
+  });
+}
+
 export function Editor() {
   const hostRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
   const wrapCompartment = useRef(new Compartment());
   const guttersCompartment = useRef(new Compartment());
+  const spellCompartment = useRef(new Compartment());
   const loadingRef = useRef(false);
   const prevTabIdRef = useRef<string | null>(null);
 
@@ -45,6 +52,7 @@ export function Editor() {
           guttersCompartment.current.of(
             showLines ? [lineNumbers(), highlightActiveLineGutter()] : [],
           ),
+          spellCompartment.current.of(spellcheckExt(!!store.settings.spellCheck)),
           keymap.of([
             ...defaultKeymap,
             ...historyKeymap,
@@ -52,7 +60,6 @@ export function Editor() {
           ]),
           highlightActiveLine(),
           search(),
-          EditorView.contentAttributes.of({ spellcheck: "false" }),
           EditorView.updateListener.of((u) => {
             if (u.docChanged && !loadingRef.current) {
               const id = useStore.getState().activeTabId;
@@ -129,6 +136,12 @@ export function Editor() {
       ),
     });
   }, [settings.showLineNumbers]);
+
+  useEffect(() => {
+    viewRef.current?.dispatch({
+      effects: spellCompartment.current.reconfigure(spellcheckExt(!!settings.spellCheck)),
+    });
+  }, [settings.spellCheck]);
 
   const fontSize = settings.fontSize * (settings.zoom / 100);
 

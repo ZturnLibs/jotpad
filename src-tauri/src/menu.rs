@@ -267,6 +267,7 @@ pub fn default_menu<R: Runtime, M: Manager<R>>(
             SEP,
             check("alwaysOnTop", "窗口置顶", false),
             check("wordWrap", "自动换行", true),
+            check("spellCheck", "拼写检查", false),
             check("statusBar", "状态栏", true),
             MenuNode::Submenu {
                 text: "主题".to_string(),

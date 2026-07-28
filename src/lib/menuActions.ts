@@ -135,6 +135,19 @@ export function getMenuModel(): MenuModel {
           { id: "clearRecent", label: t("file.clearRecent") },
         ];
 
+  const sessions = s.sessions;
+  const sessionItems: MenuItemModel[] =
+    sessions.length === 0
+      ? [{ id: "sessionEmpty", label: t("file.sessionEmpty"), disabled: true }]
+      : [
+          ...sessions.slice(0, 12).map((sess) => ({
+            id: `session-${sess.id}`,
+            label: sess.name,
+          })),
+          { sep: true },
+          { id: "clearSessions", label: t("file.clearSessions") },
+        ];
+
   const file: MenuItemModel[] = [
     { id: "new", label: t("file.new"), shortcut: `${MOD}+N`, accel: A("N") },
     {
@@ -148,6 +161,13 @@ export function getMenuModel(): MenuModel {
       id: "recent",
       label: t("file.recent"),
       submenu: recentItems,
+    },
+    { sep: true },
+    { id: "saveSession", label: t("file.saveSession") },
+    {
+      id: "sessions",
+      label: t("file.sessions"),
+      submenu: sessionItems,
     },
     { sep: true },
     { id: "save", label: t("file.save"), shortcut: `${MOD}+S`, accel: A("S") },
@@ -231,6 +251,11 @@ export function getMenuModel(): MenuModel {
       checked: s.settings.showLineNumbers,
     },
     {
+      id: "spellCheck",
+      label: t("view.spellCheck"),
+      checked: s.settings.spellCheck,
+    },
+    {
       id: "statusBar",
       label: t("view.statusBar"),
       checked: s.settings.showStatusBar,
@@ -306,6 +331,12 @@ export function runMenuAction(id: string): void {
       break;
     case "clearRecent":
       s.clearRecent();
+      break;
+    case "saveSession":
+      s.requestSaveSession();
+      break;
+    case "clearSessions":
+      s.clearSessions();
       break;
     case "save":
       if (s.activeTabId) void s.saveTab(s.activeTabId);
@@ -384,6 +415,9 @@ export function runMenuAction(id: string): void {
     case "lineNumbers":
       s.setSettings({ showLineNumbers: !s.settings.showLineNumbers });
       break;
+    case "spellCheck":
+      s.setSettings({ spellCheck: !s.settings.spellCheck });
+      break;
     case "statusBar":
       s.setSettings({ showStatusBar: !s.settings.showStatusBar });
       break;
@@ -411,6 +445,8 @@ export function runMenuAction(id: string): void {
         const idx = parseInt(id.slice(7), 10);
         const path = s.recentFiles[idx];
         if (path) void s.openPath(path);
+      } else if (id.startsWith("session-")) {
+        s.requestOpenSession(id.slice(8));
       } else if (id.startsWith("enc-")) {
         s.setEncoding(id.slice(4) as Encoding);
       } else if (id.startsWith("le-")) {

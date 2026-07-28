@@ -1,0 +1,38 @@
+---
+description: TypeScript / Zustand / lib 层函数单一职责与注释约定
+globs: src/**/*.{ts,tsx}
+alwaysApply: false
+---
+
+# TypeScript 与状态层
+
+## 函数单一职责
+
+- `src/lib/` 中每个导出函数做一件事（解析路径、统计文本、搜索选项等）。
+- 文件 I/O、编码转换走 `src/lib/backend.ts`（或现有 API），UI 层不直接拼 Tauri 调用细节。
+- 纯逻辑与 React 解耦，便于 `*.test.ts` 单测。
+
+```ts
+// ❌ BAD
+async function saveAndCloseAndNotify(tab) { /* 保存+关标签+弹窗 */ }
+
+// ✅ GOOD
+async function saveTab(id: string): Promise<boolean> { /* 只保存 */ }
+// 关标签、提示由调用方组合
+```
+
+## Store（Zustand）
+
+- action 命名动词化：`openPath`、`setContent`、`requestClose`。
+- 持久化字段与瞬时 UI 状态分开注释标明。
+- 派生数据用方法或选择器，不在多处重复计算。
+
+## 类型
+
+- 共享类型放 `src/types.ts`；避免 `any`，必要时用收窄联合类型。
+- 新增设置项同步：`AppSettings`、`DEFAULT_SETTINGS`、i18n、设置 UI。
+
+## 中文注释场景
+
+- 编码、BOM、行尾、草稿版本号、最近文件上限等规则必须中文注明。
+- 导出工具函数在文件头或函数上用一行中文说明用途与边界。

@@ -17,7 +17,7 @@ import { StatusBar } from "@/components/StatusBar";
 import { Settings } from "@/components/Settings";
 import { ContextMenu } from "@/components/ContextMenu";
 import { PageSetup } from "@/components/PageSetup";
-import { About, ConfirmDialog, GotoDialog, ReloadDialog } from "@/components/Dialogs";
+import { About, ConfirmDialog, GotoDialog, ReloadDialog, SessionNameDialog } from "@/components/Dialogs";
 
 function applyTheme(mode: "light" | "dark" | "system") {
   const effective =
@@ -38,6 +38,7 @@ export function App() {
   const activeTabId = useStore((s) => s.activeTabId);
   const tabsLen = useStore((s) => s.tabs.length);
   const recentLen = useStore((s) => s.recentFiles.length);
+  const sessionsLen = useStore((s) => s.sessions.length);
   const alwaysOnTop = useStore((s) => s.alwaysOnTop);
   const activeTab = useStore((s) => s.tabs.find((t) => t.id === s.activeTabId));
   const t = useT();
@@ -65,7 +66,7 @@ export function App() {
     if (!ready) return;
     void startNativeMenuListener();
     applyNativeMenuDebounced();
-  }, [ready, settings, activeTabId, tabsLen, recentLen, alwaysOnTop]);
+  }, [ready, settings, activeTabId, tabsLen, recentLen, sessionsLen, alwaysOnTop]);
 
   // Apply theme; react to system changes when in "system" mode.
   useEffect(() => {
@@ -358,6 +359,7 @@ export function App() {
       </div>
       <ContextMenu />
       <ConfirmDialog />
+      <SessionNameDialog />
       <ReloadDialog />
       <GotoDialog />
       <PageSetup />

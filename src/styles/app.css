@@ -113,6 +113,35 @@ textarea {
   height: 40px;
 }
 
+.tabs-filter {
+  flex-shrink: 0;
+  padding: 0 8px 6px;
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+.tabs-filter-input {
+  width: 100%;
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--editor-bg);
+  color: var(--text);
+  font-size: 12px;
+  outline: none;
+}
+.tabs-filter-input:focus {
+  border-color: var(--accent);
+}
+.tabs-filter-input::placeholder {
+  color: var(--text-secondary);
+}
+.tabs-filter-empty {
+  padding: 10px 8px;
+  font-size: 12px;
+  text-align: center;
+}
+
 .tabs-scroll {
   display: flex;
   flex-direction: column;

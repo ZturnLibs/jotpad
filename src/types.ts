@@ -27,8 +27,20 @@ export const LINE_ENDINGS: LineEnding[] = ["CRLF", "LF", "CR"];
 
 export type ThemeMode = "light" | "dark" | "system";
 export type Locale = "zh-CN" | "en";
+/** On launch: restore last tabs, or start with a blank untitled tab. */
+export type StartupMode = "restore" | "blank";
 
 export const LOCALES: Locale[] = ["zh-CN", "en"];
+
+/** A named group of on-disk files that can be reopened together. */
+export interface NamedSession {
+  id: string;
+  name: string;
+  paths: string[];
+  /** Active file path when the session was saved (if still in paths). */
+  activePath: string | null;
+  updatedAt: number;
+}
 
 /** A single open document (tab). */
 export interface TabState {
@@ -62,6 +74,10 @@ export interface AppSettings {
   zoom: number; // percent
   showStatusBar: boolean;
   showLineNumbers: boolean;
+  /** Browser/OS spellcheck on the editor (English etc. via system dictionary). */
+  spellCheck: boolean;
+  /** Whether to restore open tabs on launch. */
+  startupMode: StartupMode;
   accent: string; // "system" or hex like "#0067C0"
 }
 
@@ -71,6 +87,7 @@ export interface AppState {
   activeTabId: string | null;
   settings: AppSettings;
   recentFiles: string[];
+  sessions: NamedSession[];
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -82,6 +99,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   zoom: 100,
   showStatusBar: true,
   showLineNumbers: false,
+  spellCheck: false,
+  startupMode: "restore",
   accent: "system",
 };
 

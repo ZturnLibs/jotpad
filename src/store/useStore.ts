@@ -8,6 +8,8 @@ import type {
   AppState,
   Encoding,
   LineEnding,
+  NamedSession,
+  StartupMode,
   TabState,
 } from "@/types";
 import { DEFAULT_SETTINGS } from "@/types";
@@ -15,14 +17,16 @@ import * as api from "@/lib/backend";
 import { basename, dirname, joinPath } from "@/lib/backend";
 import { getEditorView } from "@/lib/editorRef";
 
-const STATE_VERSION = 1;
+const STATE_VERSION = 2;
 const MAX_RECENT = 20;
+const MAX_SESSIONS = 20;
 
 export type MenuKind = "file" | "edit" | "view" | null;
 
 interface ConfirmState {
-  kind: "close" | "exit";
+  kind: "close" | "exit" | "openSession";
   tabIds: string[];
+  sessionId?: string;
 }
 
 interface ReloadPrompt {
@@ -36,6 +40,7 @@ interface Store {
   activeTabId: string | null;
   settings: AppSettings;
   recentFiles: string[];
+  sessions: NamedSession[];
 
   // Transient UI flags
   findOpen: boolean;
@@ -44,6 +49,7 @@ interface Store {
   settingsOpen: boolean;
   aboutOpen: boolean;
   pageSetupOpen: boolean;
+  sessionNameOpen: boolean;
   menuOpen: MenuKind;
   confirm: ConfirmState | null;
   reloadPrompt: ReloadPrompt | null;
@@ -77,6 +83,14 @@ interface Store {
   /** Permanently delete the on-disk file and close the tab. */
   deleteTabFile: (id: string) => Promise<boolean>;
   clearRecent: () => void;
+  /** Prompt UI then save current on-disk tabs as a named session. */
+  requestSaveSession: () => void;
+  saveSession: (name: string) => Promise<boolean>;
+  /** Open a named session (prompts if dirty tabs exist). */
+  requestOpenSession: (id: string) => void;
+  /** Replace tabs with files from a named session. */
+  openSession: (id: string) => Promise<void>;
+  clearSessions: () => void;
   checkExternalChanges: () => Promise<void>;
   resolveReloadPrompt: (choice: "reload" | "keep") => Promise<void>;
 
@@ -93,6 +107,7 @@ interface Store {
   setSettingsOpen: (v: boolean) => void;
   setAboutOpen: (v: boolean) => void;
   setPageSetupOpen: (v: boolean) => void;
+  setSessionNameOpen: (v: boolean) => void;
   setMenuOpen: (m: MenuKind) => void;
   toggleAlwaysOnTop: () => Promise<void>;
 
@@ -126,6 +141,8 @@ function normalizeTab(t: TabState): TabState {
 
 function normalizeSettings(raw: Partial<AppSettings> & Record<string, unknown>): AppSettings {
   const merged = { ...DEFAULT_SETTINGS, ...raw };
+  const startupMode: StartupMode =
+    merged.startupMode === "blank" ? "blank" : "restore";
   return {
     theme: merged.theme,
     locale: merged.locale,
@@ -135,8 +152,33 @@ function normalizeSettings(raw: Partial<AppSettings> & Record<string, unknown>):
     zoom: merged.zoom,
     showStatusBar: merged.showStatusBar,
     showLineNumbers: !!merged.showLineNumbers,
+    spellCheck: !!merged.spellCheck,
+    startupMode,
     accent: merged.accent,
   };
+}
+
+function normalizeSessions(raw: unknown): NamedSession[] {
+  if (!Array.isArray(raw)) return [];
+  const out: NamedSession[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== "object") continue;
+    const s = item as Partial<NamedSession>;
+    if (typeof s.id !== "string" || typeof s.name !== "string") continue;
+    if (!Array.isArray(s.paths)) continue;
+    const paths = s.paths.filter((p): p is string => typeof p === "string" && !!p);
+    if (!paths.length) continue;
+    out.push({
+      id: s.id,
+      name: s.name,
+      paths,
+      activePath: typeof s.activePath === "string" ? s.activePath : null,
+      updatedAt: typeof s.updatedAt === "number" ? s.updatedAt : Date.now(),
+    });
+  }
+  return out
+    .sort((a, b) => b.updatedAt - a.updatedAt)
+    .slice(0, MAX_SESSIONS);
 }
 
 async function doWrite(tab: TabState, path: string): Promise<{ size: number; mtime: number }> {
@@ -156,12 +198,35 @@ function applyDocToEditor(text: string): void {
   });
 }
 
+async function loadTabFromPath(path: string): Promise<TabState | null> {
+  try {
+    const r = await api.readFile(path);
+    return {
+      id: nanoid(8),
+      title: basename(path),
+      filePath: path,
+      content: r.text,
+      encoding: r.encoding,
+      hasBom: r.has_bom,
+      lineEnding: r.line_ending,
+      dirty: false,
+      size: r.size,
+      diskMtimeMs: r.mtime_ms,
+      selection: null,
+      scrollTop: 0,
+    };
+  } catch {
+    return null;
+  }
+}
+
 export const useStore = create<Store>((set, get) => ({
   ready: false,
   tabs: [],
   activeTabId: null,
   settings: DEFAULT_SETTINGS,
   recentFiles: [],
+  sessions: [],
 
   findOpen: false,
   replaceOpen: false,
@@ -169,6 +234,7 @@ export const useStore = create<Store>((set, get) => ({
   settingsOpen: false,
   aboutOpen: false,
   pageSetupOpen: false,
+  sessionNameOpen: false,
   menuOpen: null,
   confirm: null,
   reloadPrompt: null,
@@ -186,21 +252,30 @@ export const useStore = create<Store>((set, get) => ({
     } catch {
       state = null;
     }
-    if (state && Array.isArray(state.tabs) && state.tabs.length) {
-      const settings = normalizeSettings({ ...(state.settings || {}) });
-      const tabs = state.tabs.map(normalizeTab);
+    const settings = normalizeSettings({ ...(state?.settings || {}) });
+    const recentFiles = Array.isArray(state?.recentFiles) ? state!.recentFiles : [];
+    const sessions = normalizeSessions(state?.sessions);
+
+    const restoreTabs =
+      settings.startupMode === "restore" &&
+      state &&
+      Array.isArray(state.tabs) &&
+      state.tabs.length > 0;
+
+    if (restoreTabs) {
+      const tabs = state!.tabs.map(normalizeTab);
       const activeTabId =
-        state.activeTabId && tabs.some((t) => t.id === state.activeTabId)
-          ? state.activeTabId
+        state!.activeTabId && tabs.some((t) => t.id === state!.activeTabId)
+          ? state!.activeTabId
           : tabs[0].id;
       set({
         tabs,
         activeTabId,
         settings,
-        recentFiles: Array.isArray(state.recentFiles) ? state.recentFiles : [],
+        recentFiles,
+        sessions,
         ready: true,
       });
-      // Backfill mtimes for restored file tabs (silent).
       for (const tab of tabs) {
         if (!tab.filePath || tab.diskMtimeMs != null) continue;
         try {
@@ -212,14 +287,28 @@ export const useStore = create<Store>((set, get) => ({
       }
     } else {
       const t = makeUntitled();
-      set({ tabs: [t], activeTabId: t.id, settings: DEFAULT_SETTINGS, recentFiles: [], ready: true });
+      set({
+        tabs: [t],
+        activeTabId: t.id,
+        settings: state ? settings : DEFAULT_SETTINGS,
+        recentFiles,
+        sessions,
+        ready: true,
+      });
     }
   },
 
   persist: async () => {
-    const { tabs, activeTabId, settings, recentFiles, ready } = get();
+    const { tabs, activeTabId, settings, recentFiles, sessions, ready } = get();
     if (!ready) return;
-    const state: AppState = { version: STATE_VERSION, tabs, activeTabId, settings, recentFiles };
+    const state: AppState = {
+      version: STATE_VERSION,
+      tabs,
+      activeTabId,
+      settings,
+      recentFiles,
+      sessions,
+    };
     try {
       await api.writeState(state);
     } catch {
@@ -268,6 +357,10 @@ export const useStore = create<Store>((set, get) => ({
     if (choice === "save") {
       const ok = await get().saveTabs(c.tabIds);
       if (!ok) return;
+    }
+    if (c.kind === "openSession" && c.sessionId) {
+      await get().openSession(c.sessionId);
+      return;
     }
     get().doCloseTabs(c.tabIds);
     if (c.kind === "exit") {
@@ -469,6 +562,135 @@ export const useStore = create<Store>((set, get) => ({
 
   clearRecent: () => set({ recentFiles: [] }),
 
+  requestSaveSession: () => {
+    const paths = get()
+      .tabs.map((t) => t.filePath)
+      .filter((p): p is string => !!p);
+    if (!paths.length) {
+      const zh = get().settings.locale === "zh-CN";
+      void api.nativeMessage(
+        "Jotpad",
+        zh
+          ? "当前没有已保存到磁盘的文件，无法写入会话。"
+          : "No saved files to include in a session.",
+      );
+      return;
+    }
+    set({ sessionNameOpen: true });
+  },
+
+  saveSession: async (name) => {
+    const trimmed = name.trim();
+    if (!trimmed) return false;
+    const paths = [
+      ...new Set(
+        get()
+          .tabs.map((t) => t.filePath)
+          .filter((p): p is string => !!p),
+      ),
+    ];
+    if (!paths.length) return false;
+    const activePath = get().activeTab()?.filePath ?? null;
+    const now = Date.now();
+    set((s) => {
+      const existing = s.sessions.find(
+        (x) => x.name.toLowerCase() === trimmed.toLowerCase(),
+      );
+      let sessions: NamedSession[];
+      if (existing) {
+        sessions = s.sessions.map((x) =>
+          x.id === existing.id
+            ? { ...x, name: trimmed, paths, activePath, updatedAt: now }
+            : x,
+        );
+      } else {
+        sessions = [
+          {
+            id: nanoid(8),
+            name: trimmed,
+            paths,
+            activePath,
+            updatedAt: now,
+          },
+          ...s.sessions,
+        ];
+      }
+      sessions = sessions
+        .sort((a, b) => b.updatedAt - a.updatedAt)
+        .slice(0, MAX_SESSIONS);
+      return { sessions, sessionNameOpen: false };
+    });
+    await get().persist();
+    return true;
+  },
+
+  requestOpenSession: (id) => {
+    const session = get().sessions.find((x) => x.id === id);
+    if (!session) return;
+    const dirtyIds = get()
+      .tabs.filter((t) => t.dirty)
+      .map((t) => t.id);
+    if (dirtyIds.length) {
+      set({ confirm: { kind: "openSession", tabIds: dirtyIds, sessionId: id } });
+      return;
+    }
+    void get().openSession(id);
+  },
+
+  openSession: async (id) => {
+    const session = get().sessions.find((x) => x.id === id);
+    if (!session) return;
+    const loaded: TabState[] = [];
+    const missing: string[] = [];
+    for (const path of session.paths) {
+      const tab = await loadTabFromPath(path);
+      if (tab) loaded.push(tab);
+      else missing.push(path);
+    }
+    const zh = get().settings.locale === "zh-CN";
+    if (!loaded.length) {
+      await api.nativeMessage(
+        "Jotpad",
+        zh
+          ? "会话中的文件均无法打开（可能已移动或删除）。"
+          : "None of the session files could be opened (moved or deleted).",
+      );
+      return;
+    }
+    const activeTabId =
+      loaded.find((t) => t.filePath === session.activePath)?.id ?? loaded[0].id;
+    set((s) => ({
+      tabs: loaded,
+      activeTabId,
+      findOpen: false,
+      replaceOpen: false,
+      recentFiles: [
+        ...loaded.map((t) => t.filePath!).filter(Boolean),
+        ...s.recentFiles,
+      ]
+        .filter((p, i, arr) => arr.indexOf(p) === i)
+        .slice(0, MAX_RECENT),
+      sessions: s.sessions
+        .map((x) => (x.id === id ? { ...x, updatedAt: Date.now() } : x))
+        .sort((a, b) => b.updatedAt - a.updatedAt),
+    }));
+    if (missing.length) {
+      const list = missing.map((p) => basename(p)).join(", ");
+      await api.nativeMessage(
+        "Jotpad",
+        zh
+          ? `以下文件无法打开，已跳过：${list}`
+          : `Skipped missing files: ${list}`,
+      );
+    }
+    await get().persist();
+  },
+
+  clearSessions: () => {
+    set({ sessions: [] });
+    void get().persist();
+  },
+
   checkExternalChanges: async () => {
     if (get().reloadPrompt) return;
     for (const tab of get().tabs) {
@@ -545,6 +767,7 @@ export const useStore = create<Store>((set, get) => ({
   setSettingsOpen: (v) => set({ settingsOpen: v }),
   setAboutOpen: (v) => set({ aboutOpen: v }),
   setPageSetupOpen: (v) => set({ pageSetupOpen: v }),
+  setSessionNameOpen: (v) => set({ sessionNameOpen: v }),
   setMenuOpen: (m) => set({ menuOpen: m }),
 
   toggleAlwaysOnTop: async () => {

@@ -1,0 +1,55 @@
+---
+description: Tauri / Rust 分包模块化、单一职责与中文注释
+globs: src-tauri/**/*.rs
+alwaysApply: false
+---
+
+# Tauri / Rust 实践
+
+## 分包与模块（强制）
+
+- **禁止**把文件 I/O、编码、状态持久化、菜单、壳集成等堆进同一个文件或一个「巨型类型」。
+- `lib.rs` 只做：`mod` 声明、`run`/builder 组装、`invoke_handler` 注册；业务实现放到子模块。
+- 按领域拆分，一例：
+
+```text
+src-tauri/src/
+  lib.rs              # 组装入口，保持短小
+  main.rs
+  encoding.rs         # 编解码、BOM、行尾
+  fs_ops.rs           # 读/写/mtime 等文件命令
+  state.rs            # 草稿/设置/最近文件持久化
+  menu.rs             # 应用菜单
+  shell_integration.rs  # 若过大再拆子模块目录
+  shell_integration/
+    mod.rs
+    macos.rs
+    windows.rs
+```
+
+- 单文件建议控制在约 **300–400 行**；超限按平台或子能力继续拆（`mod foo;` + `foo/`）。
+- 类型与其实现同域：编解码结构体放 `encoding`，不要集中塞进一个 `types.rs` 大杂烩。
+- 模块间通过清晰的 `pub` API 组合；避免互相 `use` 造成循环依赖。
+
+## 单一职责
+
+- 每个 `#[tauri::command]` 只做一件事。
+- 前端只通过 command 调用能力；Rust 不堆业务 UI 状态。
+
+## 组合与边界
+
+- 改菜单/窗口/文件系统权限时，同步 `capabilities/` 与前端调用点。
+- 错误返回可序列化信息，便于 i18n；不吞关键失败。
+
+## 中文注释
+
+- 平台差异、路径/权限边界、编码策略等非显而易见处必须中文说明「为什么」。
+
+```rust
+// 仅在用户显式选择「用 Jotpad 打开」时注册；避免安装时静默改系统关联
+```
+
+## 质量
+
+- 不引入与纯文本记事本定位无关的重依赖。
+- 改菜单/快捷键时同步 `src/lib/menuActions.ts` 与 i18n。

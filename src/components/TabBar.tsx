@@ -27,6 +27,7 @@ export function TabBar() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
   const [ctx, setCtx] = useState<CtxMenu | null>(null);
+  const [filter, setFilter] = useState("");
 
   const inputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -201,11 +202,32 @@ export function TabBar() {
   const hasFile = !!ctxTab?.filePath;
   const canCloseOthers = tabs.length > 1;
 
+  const filterNorm = filter.trim().toLowerCase();
+  const visibleTabs = filterNorm
+    ? tabs.filter((tab) => tabLabel(tab).toLowerCase().includes(filterNorm))
+    : tabs;
+  const showFilter = tabs.length >= 2;
+
   return (
     <div className="tabs">
       <div className="tabs-drag" data-tauri-drag-region />
+      {showFilter ? (
+        <div className="tabs-filter">
+          <input
+            className="tabs-filter-input"
+            type="search"
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            placeholder={t("tab.filterPlaceholder")}
+            aria-label={t("tab.filterPlaceholder")}
+          />
+        </div>
+      ) : null}
       <div className="tabs-scroll" ref={scrollRef} role="tablist" aria-orientation="vertical">
-        {tabs.map((tab) => {
+        {visibleTabs.length === 0 && filterNorm ? (
+          <div className="tabs-filter-empty muted">{t("tab.filterEmpty")}</div>
+        ) : null}
+        {visibleTabs.map((tab) => {
           const active = tab.id === activeTabId;
           const title = tabLabel(tab);
           const editing = editingId === tab.id;

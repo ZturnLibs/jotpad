@@ -1,0 +1,40 @@
+---
+description: React 组件单一职责与组合扩展模式
+globs: src/**/*.{tsx,jsx}
+alwaysApply: false
+---
+
+# React 组件实践
+
+## 单一职责
+
+- 一个文件一个主要导出组件；附属小组件仅服务该文件的组合需要。
+- 数据订阅尽量细粒度：`useStore((s) => s.x)`，避免整棵 store 订阅。
+- 副作用（编辑器挂载、菜单、快捷键）放独立 effect 或抽到 lib/hook。
+
+## 用组合扩展
+
+```tsx
+// ❌ BAD：靠 flag 堆功能
+<Editor showFind showGoto showMinimap />
+
+// ✅ GOOD：由父级组合
+<>
+  <Editor />
+  {findOpen && <FindBar mode="find" />}
+  {gotoOpen && <GotoDialog />}
+</>
+```
+
+- 变体用 children / 插槽 / 小组件，而不是越来越多的布尔 props。
+- 对话框、菜单、浮层与主编辑区解耦，通过 store 或回调通信。
+
+## 注释
+
+- 复杂交互（标签切换、外部文件变更、CodeMirror 同步）在 effect 入口写中文「为何如此」。
+- Props 仅在含义非自明时用中文 JSDoc 简短说明。
+
+## 样式与结构
+
+- 样式放 `src/styles/`；类名与现有 `app.css` 约定一致。
+- 不引入新 UI 库；保持记事本式轻量界面。
