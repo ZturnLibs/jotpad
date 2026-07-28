@@ -50,9 +50,11 @@ export interface MenuModel {
   fileLabel: string;
   editLabel: string;
   viewLabel: string;
+  windowLabel: string;
   file: MenuItemModel[];
   edit: MenuItemModel[];
   view: MenuItemModel[];
+  window: MenuItemModel[];
 }
 
 const isMac = platform() === "macos";
@@ -240,15 +242,6 @@ export function getMenuModel(): MenuModel {
     },
     { sep: true },
     {
-      id: "alwaysOnTop",
-      label: t("view.alwaysOnTop"),
-      checked: s.alwaysOnTop,
-      shortcut: `${MOD}+Shift+T`,
-      accel: A("Shift+T"),
-    },
-    { id: "nextTab", label: t("view.nextTab"), shortcut: isMac ? `${MOD}+Option+→` : "Ctrl+Tab" },
-    { id: "prevTab", label: t("view.prevTab"), shortcut: isMac ? `${MOD}+Option+←` : "Ctrl+Shift+Tab" },
-    {
       id: "wordWrap",
       label: t("view.wordWrap"),
       checked: s.settings.wordWrap,
@@ -309,13 +302,37 @@ export function getMenuModel(): MenuModel {
     { id: "settings", label: t("toolbar.settings"), shortcut: `${MOD}+,`, accel: A(",") },
   ];
 
+  // Window — document/window chrome (TextEdit / browsers / VS Code pattern).
+  const windowMenu: MenuItemModel[] = [
+    {
+      id: "nextTab",
+      label: t("window.nextTab"),
+      shortcut: isMac ? `${MOD}+Option+→` : "Ctrl+Tab",
+    },
+    {
+      id: "prevTab",
+      label: t("window.prevTab"),
+      shortcut: isMac ? `${MOD}+Option+←` : "Ctrl+Shift+Tab",
+    },
+    { sep: true },
+    {
+      id: "alwaysOnTop",
+      label: t("window.alwaysOnTop"),
+      checked: s.alwaysOnTop,
+      shortcut: `${MOD}+Shift+T`,
+      accel: A("Shift+T"),
+    },
+  ];
+
   return {
     fileLabel: t("menu.file"),
     editLabel: t("menu.edit"),
     viewLabel: t("menu.view"),
+    windowLabel: t("menu.window"),
     file,
     edit,
     view,
+    window: windowMenu,
   };
 }
 

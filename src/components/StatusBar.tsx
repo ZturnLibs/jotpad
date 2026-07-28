@@ -67,7 +67,7 @@ export function StatusBar() {
       <span
         className={"sb-item sb-click" + (alwaysOnTop ? " sb-on" : "")}
         onClick={() => void toggleAlwaysOnTop()}
-        title={t("view.alwaysOnTop")}
+        title={t("window.alwaysOnTop")}
       >
         {alwaysOnTop ? t("status.pinned") : t("status.pin")}
       </span>

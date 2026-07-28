@@ -266,7 +266,6 @@ pub fn default_menu<R: Runtime, M: Manager<R>>(
                 ],
             },
             SEP,
-            check("alwaysOnTop", "窗口置顶", false),
             check("wordWrap", "自动换行", true),
             check("spellCheck", "拼写检查", false),
             check("statusBar", "状态栏", true),
@@ -315,7 +314,18 @@ pub fn default_menu<R: Runtime, M: Manager<R>>(
         ],
     };
 
-    let nodes = [app_menu, file_menu, edit_menu, view_menu];
+    let window_menu = MenuNode::Submenu {
+        text: "窗口".to_string(),
+        enabled: true,
+        items: vec![
+            item("nextTab", "下一个标签页", None),
+            item("prevTab", "上一个标签页", None),
+            SEP,
+            check("alwaysOnTop", "窗口置顶", false),
+        ],
+    };
+
+    let nodes = [app_menu, file_menu, edit_menu, view_menu, window_menu];
     let mut mb = MenuBuilder::new(app);
     for node in &nodes {
         if let MenuNode::Submenu { text, items, enabled } = node {

@@ -83,6 +83,7 @@ export async function applyNativeMenu(): Promise<void> {
 
   menus.push({ type: "submenu", text: model.editLabel, items: toDefs(model.edit) });
   menus.push({ type: "submenu", text: model.viewLabel, items: toDefs(model.view) });
+  menus.push({ type: "submenu", text: model.windowLabel, items: toDefs(model.window) });
 
   try {
     await invoke("set_app_menu", { menus });

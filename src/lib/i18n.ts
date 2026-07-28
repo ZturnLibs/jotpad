@@ -12,6 +12,7 @@ const zhCN: Dict = {
   "menu.file": "文件",
   "menu.edit": "编辑",
   "menu.view": "查看",
+  "menu.window": "窗口",
   "menu.help": "帮助",
 
   // File menu
@@ -65,9 +66,6 @@ const zhCN: Dict = {
   "view.statusBar": "状态栏",
   "view.wordWrap": "自动换行",
   "view.lineNumbers": "行号",
-  "view.alwaysOnTop": "窗口置顶",
-  "view.nextTab": "下一个标签页",
-  "view.prevTab": "上一个标签页",
   "view.spellCheck": "拼写检查",
   "view.theme": "主题",
   "view.themeLight": "浅色",
@@ -76,6 +74,11 @@ const zhCN: Dict = {
   "view.language": "语言",
   "view.encoding": "编码",
   "view.lineEnding": "行尾",
+
+  // Window menu
+  "window.nextTab": "下一个标签页",
+  "window.prevTab": "上一个标签页",
+  "window.alwaysOnTop": "窗口置顶",
 
   // Toolbar
   "toolbar.font": "字体",
@@ -203,6 +206,7 @@ const en: Dict = {
   "menu.file": "File",
   "menu.edit": "Edit",
   "menu.view": "View",
+  "menu.window": "Window",
   "menu.help": "Help",
 
   "file.new": "New Tab",
@@ -253,9 +257,6 @@ const en: Dict = {
   "view.statusBar": "Status Bar",
   "view.wordWrap": "Word Wrap",
   "view.lineNumbers": "Line Numbers",
-  "view.alwaysOnTop": "Always on Top",
-  "view.nextTab": "Next Tab",
-  "view.prevTab": "Previous Tab",
   "view.spellCheck": "Spell Check",
   "view.theme": "Theme",
   "view.themeLight": "Light",
@@ -264,6 +265,10 @@ const en: Dict = {
   "view.language": "Language",
   "view.encoding": "Encoding",
   "view.lineEnding": "Line Ending",
+
+  "window.nextTab": "Next Tab",
+  "window.prevTab": "Previous Tab",
+  "window.alwaysOnTop": "Always on Top",
 
   "toolbar.font": "Font",
   "toolbar.fontSize": "Font Size",
