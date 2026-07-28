@@ -146,6 +146,12 @@ fn rename_file(from: String, to: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+fn delete_file(path: String) -> Result<(), String> {
+    let path = path.trim_start_matches("file://");
+    fs::remove_file(path).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 fn write_file(
     path: String,
     text: String,
@@ -289,6 +295,7 @@ pub fn run() {
             write_file,
             file_mtime,
             rename_file,
+            delete_file,
             read_state,
             write_state,
             set_app_menu,

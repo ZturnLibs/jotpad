@@ -72,6 +72,8 @@ interface Store {
   saveTabs: (ids: string[]) => Promise<boolean>;
   /** Rename an on-disk tab by new file name (same directory). */
   renameTab: (id: string, newName: string) => Promise<boolean>;
+  /** Permanently delete the on-disk file and close the tab. */
+  deleteTabFile: (id: string) => Promise<boolean>;
   clearRecent: () => void;
   checkExternalChanges: () => Promise<void>;
   resolveReloadPrompt: (choice: "reload" | "keep") => Promise<void>;
@@ -431,6 +433,34 @@ export const useStore = create<Store>((set, get) => ({
       await api.nativeMessage("Jotpad", friendly);
       return false;
     }
+  },
+
+  deleteTabFile: async (id) => {
+    const tab = get().tabs.find((t) => t.id === id);
+    if (!tab?.filePath) return false;
+    const name = basename(tab.filePath);
+    const zh = get().settings.locale === "zh-CN";
+    const ok = await api.nativeConfirm(
+      "Jotpad",
+      zh
+        ? `确定永久删除「${name}」？此操作无法撤销。`
+        : `Permanently delete “${name}”? This cannot be undone.`,
+      zh ? "删除" : "Delete",
+      zh ? "取消" : "Cancel",
+    );
+    if (!ok) return false;
+    const path = tab.filePath;
+    try {
+      await api.deleteFile(path);
+    } catch (e) {
+      await api.nativeMessage("Jotpad", String(e));
+      return false;
+    }
+    set((s) => ({
+      recentFiles: s.recentFiles.filter((p) => p !== path),
+    }));
+    get().doCloseTabs([id]);
+    return true;
   },
 
   clearRecent: () => set({ recentFiles: [] }),

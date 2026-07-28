@@ -42,6 +42,22 @@ export function renameFile(from: string, to: string): Promise<void> {
   return invoke<void>("rename_file", { from, to });
 }
 
+/** Delete a file on disk. */
+export function deleteFile(path: string): Promise<void> {
+  return invoke<void>("delete_file", { path });
+}
+
+/** Write text to the OS clipboard. */
+export function clipboardWriteText(text: string): Promise<void> {
+  return invoke<void>("clipboard_write_text", { text });
+}
+
+/** Reveal a path in the OS file manager (Finder / Explorer). */
+export async function revealInFolder(path: string): Promise<void> {
+  const { revealItemInDir } = await import("@tauri-apps/plugin-opener");
+  await revealItemInDir(path);
+}
+
 export function readState(): Promise<AppState | null> {
   return invoke<AppState | null>("read_state");
 }

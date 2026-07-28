@@ -84,6 +84,12 @@ const zhCN: Dict = {
   "tab.untitled": "新建",
   "tab.rename": "重命名",
   "tab.unsaved": "未保存",
+  "tab.copyPath": "复制路径",
+  "tab.reveal": "在 Finder 中显示",
+  "tab.revealWin": "在资源管理器中显示",
+  "tab.revealLinux": "在文件管理器中显示",
+  "tab.deleteFile": "删除文件",
+  "tab.noFile": "尚未保存到磁盘",
 
   // Find / Replace
   "find.find": "查找",
@@ -229,6 +235,12 @@ const en: Dict = {
   "tab.untitled": "Untitled",
   "tab.rename": "Rename",
   "tab.unsaved": "Unsaved",
+  "tab.copyPath": "Copy Path",
+  "tab.reveal": "Show in Finder",
+  "tab.revealWin": "Show in Explorer",
+  "tab.revealLinux": "Show in File Manager",
+  "tab.deleteFile": "Delete File",
+  "tab.noFile": "Not saved to disk yet",
 
   "find.find": "Find",
   "find.placeholder": "Find",

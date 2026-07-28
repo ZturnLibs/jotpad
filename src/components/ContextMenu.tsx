@@ -18,6 +18,8 @@ export function ContextMenu() {
   useEffect(() => {
     const onCtx = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
+      // Sidebar tabs have their own context menu.
+      if (target.closest(".tab") || target.closest(".tabs")) return;
       if (
         target.closest(".cm-content") ||
         target.closest(".cm-editor") ||

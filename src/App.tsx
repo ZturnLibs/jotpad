@@ -51,6 +51,14 @@ export function App() {
     document.documentElement.dataset.platform = platform();
   }, []);
 
+  // Suppress the WebView/browser native context menu app-wide.
+  // Custom menus (editor / sidebar tabs) still work; they only need preventDefault too.
+  useEffect(() => {
+    const block = (e: Event) => e.preventDefault();
+    document.addEventListener("contextmenu", block);
+    return () => document.removeEventListener("contextmenu", block);
+  }, []);
+
   // Native system menu bar on every platform (macOS top bar / Win·Linux window menu).
   useEffect(() => {
     if (!ready) return;

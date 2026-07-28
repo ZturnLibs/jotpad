@@ -1,8 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useStore } from "@/store/useStore";
 import { useT } from "@/lib/i18n";
-import { basename } from "@/lib/backend";
+import { basename, clipboardWriteText, nativeMessage, revealInFolder } from "@/lib/backend";
+import { platform } from "@/lib/utils";
 import { Icon } from "./icons";
+
+interface CtxMenu {
+  tabId: string;
+  x: number;
+  y: number;
+}
+
+type CtxAction = "copyPath" | "rename" | "reveal" | "delete" | "close" | "closeOthers";
 
 export function TabBar() {
   const tabs = useStore((s) => s.tabs);
@@ -11,13 +20,17 @@ export function TabBar() {
   const newTab = useStore((s) => s.newTab);
   const requestClose = useStore((s) => s.requestClose);
   const renameTab = useStore((s) => s.renameTab);
+  const deleteTabFile = useStore((s) => s.deleteTabFile);
+  const doCloseTabs = useStore((s) => s.doCloseTabs);
   const t = useT();
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
+  const [ctx, setCtx] = useState<CtxMenu | null>(null);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const ctxRef = useRef<HTMLDivElement>(null);
   const skipCommit = useRef(false);
   /** Ignore blur right after entering rename (dblclick can steal focus). */
   const armedAt = useRef(0);
@@ -29,6 +42,13 @@ export function TabBar() {
       tab.filePath ? basename(tab.filePath) : t("tab.untitled"),
     [t],
   );
+
+  const revealLabel = (() => {
+    const p = platform();
+    if (p === "windows") return t("tab.revealWin");
+    if (p === "linux") return t("tab.revealLinux");
+    return t("tab.reveal");
+  })();
 
   const scrollActiveIntoView = useCallback(() => {
     const root = scrollRef.current;
@@ -56,6 +76,27 @@ export function TabBar() {
     return () => window.clearTimeout(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editingId]);
+
+  useEffect(() => {
+    if (!ctx) return;
+    const close = () => setCtx(null);
+    const onDown = (e: MouseEvent) => {
+      if (ctxRef.current && !ctxRef.current.contains(e.target as Node)) close();
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") close();
+    };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("scroll", close, true);
+    window.addEventListener("resize", close);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("scroll", close, true);
+      window.removeEventListener("resize", close);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [ctx]);
 
   const startRename = (id: string, filePath: string) => {
     skipCommit.current = false;
@@ -85,6 +126,80 @@ export function TabBar() {
     setEditingId(null);
     await renameTab(id, name);
   };
+
+  const runCtxAction = async (action: CtxAction) => {
+    if (!ctx) return;
+    const { tabId } = ctx;
+    setCtx(null);
+    const tab = useStore.getState().tabs.find((x) => x.id === tabId);
+    if (!tab) return;
+
+    switch (action) {
+      case "copyPath": {
+        if (!tab.filePath) {
+          await nativeMessage("Jotpad", t("tab.noFile"));
+          return;
+        }
+        try {
+          await clipboardWriteText(tab.filePath);
+        } catch (e) {
+          await nativeMessage("Jotpad", String(e));
+        }
+        break;
+      }
+      case "rename": {
+        if (!tab.filePath) {
+          await nativeMessage("Jotpad", t("tab.noFile"));
+          return;
+        }
+        setActiveTab(tabId);
+        startRename(tabId, tab.filePath);
+        break;
+      }
+      case "reveal": {
+        if (!tab.filePath) {
+          await nativeMessage("Jotpad", t("tab.noFile"));
+          return;
+        }
+        try {
+          await revealInFolder(tab.filePath);
+        } catch (e) {
+          await nativeMessage("Jotpad", String(e));
+        }
+        break;
+      }
+      case "delete": {
+        await deleteTabFile(tabId);
+        break;
+      }
+      case "close": {
+        if (editingId === tabId) cancelRename();
+        requestClose(tabId);
+        break;
+      }
+      case "closeOthers": {
+        const others = useStore
+          .getState()
+          .tabs.filter((x) => x.id !== tabId)
+          .map((x) => x.id);
+        if (!others.length) return;
+        setActiveTab(tabId);
+        const dirty = others.some(
+          (id) => useStore.getState().tabs.find((x) => x.id === id)?.dirty,
+        );
+        if (dirty) {
+          useStore.setState({ confirm: { kind: "close", tabIds: others } });
+        } else {
+          doCloseTabs(others);
+        }
+        break;
+      }
+    }
+  };
+
+  const ctxTab = ctx ? tabs.find((x) => x.id === ctx.tabId) : null;
+  const hasFile = !!ctxTab?.filePath;
+  const canCloseOthers = tabs.length > 1;
 
   return (
     <div className="tabs">
@@ -128,6 +243,17 @@ export function TabBar() {
                 lastClick.current = null;
                 setActiveTab(tab.id);
                 startRename(tab.id, tab.filePath);
+              }}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (editing) return;
+                setActiveTab(tab.id);
+                setCtx({
+                  tabId: tab.id,
+                  x: Math.min(e.clientX, window.innerWidth - 220),
+                  y: Math.min(e.clientY, window.innerHeight - 260),
+                });
               }}
               onAuxClick={(e) => {
                 if (e.button === 1) requestClose(tab.id);
@@ -201,6 +327,62 @@ export function TabBar() {
         <Icon name="plus" size={16} />
         <span className="tab-new-label">{t("tab.new")}</span>
       </button>
+
+      {ctx ? (
+        <div
+          className="context-menu"
+          ref={ctxRef}
+          style={{ left: ctx.x, top: ctx.y }}
+          role="menu"
+        >
+          <div
+            className={"menu-row" + (hasFile ? "" : " disabled")}
+            role="menuitem"
+            onClick={() => hasFile && void runCtxAction("copyPath")}
+          >
+            <span className="check" />
+            <span className="label">{t("tab.copyPath")}</span>
+          </div>
+          <div
+            className={"menu-row" + (hasFile ? "" : " disabled")}
+            role="menuitem"
+            onClick={() => hasFile && void runCtxAction("rename")}
+          >
+            <span className="check" />
+            <span className="label">{t("tab.rename")}</span>
+          </div>
+          <div
+            className={"menu-row" + (hasFile ? "" : " disabled")}
+            role="menuitem"
+            onClick={() => hasFile && void runCtxAction("reveal")}
+          >
+            <span className="check" />
+            <span className="label">{revealLabel}</span>
+          </div>
+          <div className="menu-sep" />
+          <div
+            className={"menu-row" + (hasFile ? "" : " disabled")}
+            role="menuitem"
+            onClick={() => hasFile && void runCtxAction("delete")}
+          >
+            <span className="check" />
+            <span className="label">{t("tab.deleteFile")}</span>
+          </div>
+          <div className="menu-sep" />
+          <div className="menu-row" role="menuitem" onClick={() => void runCtxAction("close")}>
+            <span className="check" />
+            <span className="label">{t("tab.close")}</span>
+          </div>
+          <div
+            className={"menu-row" + (canCloseOthers ? "" : " disabled")}
+            role="menuitem"
+            onClick={() => canCloseOthers && void runCtxAction("closeOthers")}
+          >
+            <span className="check" />
+            <span className="label">{t("tab.closeOthers")}</span>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
