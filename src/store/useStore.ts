@@ -57,6 +57,13 @@ interface Store {
   /** Window always-on-top (not persisted). */
   alwaysOnTop: boolean;
 
+  /** 语音包状态（不持久化，启动/下载后刷新）。 */
+  voicePack: api.VoicePackStatus | null;
+  voiceOpen: boolean;
+  voiceSetupOpen: boolean;
+  /** 打开设置时定位到语音区块。 */
+  settingsFocus: "voice" | null;
+
   // Derived
   activeTab: () => TabState | undefined;
 
@@ -112,6 +119,12 @@ interface Store {
   setSessionNameOpen: (v: boolean) => void;
   setMenuOpen: (m: MenuKind) => void;
   toggleAlwaysOnTop: () => Promise<void>;
+  setVoiceOpen: (v: boolean) => void;
+  setVoiceSetupOpen: (v: boolean) => void;
+  setSettingsFocus: (v: "voice" | null) => void;
+  refreshVoicePack: () => Promise<void>;
+  /** 菜单/快捷键入口：未就绪则引导下载，就绪则开录音条。 */
+  requestVoiceDictation: () => Promise<void>;
 
   // Exit
   requestExit: () => Promise<void>;
@@ -242,6 +255,10 @@ export const useStore = create<Store>((set, get) => ({
   confirm: null,
   reloadPrompt: null,
   alwaysOnTop: false,
+  voicePack: null,
+  voiceOpen: false,
+  voiceSetupOpen: false,
+  settingsFocus: null,
 
   activeTab: () => {
     const { tabs, activeTabId } = get();
@@ -279,6 +296,7 @@ export const useStore = create<Store>((set, get) => ({
         sessions,
         ready: true,
       });
+      void get().refreshVoicePack();
       for (const tab of tabs) {
         if (!tab.filePath || tab.diskMtimeMs != null) continue;
         try {
@@ -298,6 +316,7 @@ export const useStore = create<Store>((set, get) => ({
         sessions,
         ready: true,
       });
+      void get().refreshVoicePack();
     }
   },
 
@@ -781,6 +800,39 @@ export const useStore = create<Store>((set, get) => ({
       set({ alwaysOnTop: next });
     } catch (e) {
       console.error("setAlwaysOnTop failed", e);
+    }
+  },
+
+  setVoiceOpen: (v) => set({ voiceOpen: v }),
+  setVoiceSetupOpen: (v) => set({ voiceSetupOpen: v }),
+  setSettingsFocus: (v) => set({ settingsFocus: v }),
+
+  refreshVoicePack: async () => {
+    try {
+      const status = await api.voicePackStatus();
+      set({ voicePack: status });
+    } catch (e) {
+      set({
+        voicePack: {
+          state: "error",
+          version: null,
+          engine: null,
+          path: null,
+          error: e instanceof Error ? e.message : String(e),
+          received: 0,
+          total: 0,
+        },
+      });
+    }
+  },
+
+  requestVoiceDictation: async () => {
+    await get().refreshVoicePack();
+    const pack = get().voicePack;
+    if (pack?.state === "ready") {
+      set({ voiceSetupOpen: false, voiceOpen: true, findOpen: false, replaceOpen: false });
+    } else {
+      set({ voiceOpen: false, voiceSetupOpen: true });
     }
   },
 

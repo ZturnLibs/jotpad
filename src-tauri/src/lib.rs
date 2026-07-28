@@ -1,6 +1,7 @@
 // Jotpad backend: multi-encoding file I/O + persistent state (drafts/settings/recents).
 mod menu;
 mod shell_integration;
+mod voice;
 
 use encoding_rs::{BIG5, EUC_KR, GBK, SHIFT_JIS, UTF_8, UTF_16BE, UTF_16LE, WINDOWS_1252, Encoding};
 use serde::Serialize;
@@ -290,6 +291,7 @@ pub fn run() {
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .manage(voice::VoiceDownloadFlag::default())
         .invoke_handler(tauri::generate_handler![
             read_file,
             write_file,
@@ -306,6 +308,12 @@ pub fn run() {
             shell_integration::shell_integration_status,
             shell_integration::set_shell_new_text_file,
             shell_integration::set_shell_open_with,
+            voice::voice_pack_status,
+            voice::voice_pack_download,
+            voice::voice_pack_cancel_download,
+            voice::voice_pack_delete,
+            voice::voice_transcribe,
+            voice::write_bytes,
         ])
         .on_menu_event(|app, event| menu::handle_event(app, event))
         .setup(|app| {

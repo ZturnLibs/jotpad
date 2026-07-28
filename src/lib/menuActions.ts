@@ -15,7 +15,8 @@ import {
   selectAll,
   timeDateString,
 } from "@/lib/edit";
-import { clamp, MOD, platform } from "@/lib/utils";
+import { clamp, platform } from "@/lib/utils";
+import { sc } from "@/lib/shortcuts";
 import { loadPrintSetup, pageSizeCss } from "@/lib/print";
 import { basename } from "@/lib/backend";
 import {
@@ -219,6 +220,12 @@ export function getMenuModel(): MenuModel {
       accel: isMac ? A("Alt+F") : A("H"),
     },
     { id: "goto", label: t("edit.goto"), shortcut: `${MOD}+G`, accel: A("G") },
+    {
+      id: "voice",
+      label: t("edit.voice"),
+      shortcut: `${MOD}+Shift+R`,
+      accel: A("Shift+R"),
+    },
     { sep: true },
     {
       id: "selectAll",
@@ -417,6 +424,9 @@ export function runMenuAction(id: string): void {
       break;
     case "goto":
       s.setGotoOpen(true);
+      break;
+    case "voice":
+      void s.requestVoiceDictation();
       break;
     case "selectAll":
       if (v) selectAll(v);

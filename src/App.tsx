@@ -13,6 +13,7 @@ import { TabBar } from "@/components/TabBar";
 import { Toolbar } from "@/components/Toolbar";
 import { Editor } from "@/components/Editor";
 import { FindBar } from "@/components/FindBar";
+import { VoiceBar, VoiceSetupDialog } from "@/components/VoiceBar";
 import { StatusBar } from "@/components/StatusBar";
 import { Settings } from "@/components/Settings";
 import { ContextMenu } from "@/components/ContextMenu";
@@ -217,6 +218,11 @@ export function App() {
         void s.toggleAlwaysOnTop();
         return;
       }
+      if (mod && e.shiftKey && k === "r") {
+        eat();
+        void s.requestVoiceDictation();
+        return;
+      }
       if (e.key === "F5") {
         eat();
         const v = getEditorView();
@@ -281,6 +287,8 @@ export function App() {
 
       if (e.key === "Escape") {
         if (
+          s.voiceOpen ||
+          s.voiceSetupOpen ||
           s.quickOpenOpen ||
           s.findOpen ||
           s.gotoOpen ||
@@ -289,7 +297,12 @@ export function App() {
           s.menuOpen
         ) {
           eat();
-          if (s.quickOpenOpen) {
+          if (s.voiceSetupOpen) {
+            s.setVoiceSetupOpen(false);
+          } else if (s.voiceOpen) {
+            s.setVoiceOpen(false);
+            getEditorView()?.focus();
+          } else if (s.quickOpenOpen) {
             s.setQuickOpenOpen(false);
             getEditorView()?.focus();
           } else if (s.findOpen) {
@@ -404,6 +417,7 @@ export function App() {
           <div className="editor-wrap-host" style={{ flex: 1, position: "relative", minHeight: 0 }}>
             <Editor />
             <FindBar />
+            <VoiceBar />
           </div>
           <StatusBar />
         </main>
@@ -414,6 +428,7 @@ export function App() {
       <SessionNameDialog />
       <ReloadDialog />
       <GotoDialog />
+      <VoiceSetupDialog />
       <PageSetup />
       <Settings />
       <About />

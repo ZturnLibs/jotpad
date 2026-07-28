@@ -39,6 +39,9 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
+    "macOS": {
+      "infoPlist": "Info.plist"
+    },
     "fileAssociations": [
       {
         "ext": ["txt", "text", "log", "md", "markdown", "csv", "json", "xml", "yaml", "yml", "toml", "ini", "cfg", "conf"],

@@ -160,3 +160,47 @@ export function setShellOpenWith(enabled: boolean): Promise<void> {
 export function takePendingOpenPaths(): Promise<string[]> {
   return invoke<string[]>("take_pending_open_paths");
 }
+
+export type VoicePackState = "missing" | "downloading" | "ready" | "error";
+
+export interface VoicePackStatus {
+  state: VoicePackState;
+  version: string | null;
+  engine: string | null;
+  path: string | null;
+  error: string | null;
+  received: number;
+  total: number;
+}
+
+export function voicePackStatus(): Promise<VoicePackStatus> {
+  return invoke<VoicePackStatus>("voice_pack_status");
+}
+
+export function voicePackDownload(): Promise<VoicePackStatus> {
+  return invoke<VoicePackStatus>("voice_pack_download");
+}
+
+export function voicePackCancelDownload(): Promise<void> {
+  return invoke<void>("voice_pack_cancel_download");
+}
+
+export function voicePackDelete(): Promise<void> {
+  return invoke<void>("voice_pack_delete");
+}
+
+export function voiceTranscribe(wavBytes: number[] | Uint8Array): Promise<string> {
+  const bytes = wavBytes instanceof Uint8Array ? wavBytes : new Uint8Array(wavBytes);
+  let binary = "";
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]!);
+  const wavB64 = btoa(binary);
+  return invoke<string>("voice_transcribe", { wavB64 });
+}
+
+export function writeBytes(path: string, bytes: Uint8Array | number[]): Promise<void> {
+  const arr = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+  let binary = "";
+  for (let i = 0; i < arr.length; i++) binary += String.fromCharCode(arr[i]!);
+  const contentsB64 = btoa(binary);
+  return invoke<void>("write_bytes", { path, contentsB64 });
+}

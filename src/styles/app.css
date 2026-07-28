@@ -616,6 +616,60 @@ textarea {
   right: 8px;
 }
 
+/* ---------- Voice bar ---------- */
+.voicebar {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  bottom: 12px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-pop);
+  padding: 10px 12px;
+  z-index: 30;
+  animation: pop 120ms ease;
+}
+.voicebar-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.voice-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #c42b1c;
+  box-shadow: 0 0 0 0 rgba(196, 43, 28, 0.45);
+  animation: voice-pulse 1.2s ease-out infinite;
+}
+@keyframes voice-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(196, 43, 28, 0.45);
+  }
+  70% {
+    box-shadow: 0 0 0 8px rgba(196, 43, 28, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(196, 43, 28, 0);
+  }
+}
+.voice-elapsed {
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+  min-width: 3ch;
+}
+.voice-error {
+  color: #c42b1c;
+  font-size: 13px;
+}
+.voice-error-detail {
+  margin: 6px 0 0;
+  font-size: 12px;
+  word-break: break-all;
+}
+
 /* ---------- Status bar ---------- */
 .statusbar {
   display: flex;
@@ -844,7 +898,7 @@ textarea {
   background: var(--bg);
 }
 .settings-nav {
-  width: 132px;
+  width: 148px;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;

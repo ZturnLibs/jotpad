@@ -1,16 +1,18 @@
 import { useEffect, useState } from "react";
+import { listen } from "@tauri-apps/api/event";
 import { useStore } from "@/store/useStore";
 import { useT } from "@/lib/i18n";
 import { ACCENT_PRESETS, FONT_PRESETS, type Locale, type StartupMode, type ThemeMode } from "@/types";
 import { clamp } from "@/lib/utils";
 import * as api from "@/lib/backend";
 
-type SettingsTab = "appearance" | "editor" | "general";
+type SettingsTab = "appearance" | "editor" | "general" | "voice";
 
 const TABS: { id: SettingsTab; labelKey: string }[] = [
   { id: "appearance", labelKey: "settings.appearance" },
   { id: "editor", labelKey: "settings.editor" },
   { id: "general", labelKey: "settings.general" },
+  { id: "voice", labelKey: "settings.voice" },
 ];
 
 function firstName(f: string): string {
@@ -75,6 +77,9 @@ export function Settings() {
   const setOpen = useStore((s) => s.setSettingsOpen);
   const settings = useStore((s) => s.settings);
   const setSettings = useStore((s) => s.setSettings);
+  const setSettingsFocus = useStore((s) => s.setSettingsFocus);
+  const voicePack = useStore((s) => s.voicePack);
+  const refreshVoicePack = useStore((s) => s.refreshVoicePack);
   const t = useT();
   const [tab, setTab] = useState<SettingsTab>("appearance");
   const [shellNew, setShellNew] = useState(false);
@@ -82,10 +87,37 @@ export function Settings() {
   const [shellBusy, setShellBusy] = useState(false);
   const [shellError, setShellError] = useState<string | null>(null);
   const [shellPlatform, setShellPlatform] = useState<string>("");
+  const [voiceBusy, setVoiceBusy] = useState(false);
+  const [voiceProgress, setVoiceProgress] = useState<{
+    phase: string;
+    received: number;
+    total: number;
+  } | null>(null);
+  const [voiceError, setVoiceError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (open) setTab("appearance");
-  }, [open]);
+    if (!open) return;
+    // 仅在打开面板时定位；避免清掉 focus 后又把 tab 打回外观
+    const focus = useStore.getState().settingsFocus;
+    if (focus === "voice") {
+      setTab("voice");
+      setSettingsFocus(null);
+    } else {
+      setTab("appearance");
+    }
+  }, [open, setSettingsFocus]);
+
+  useEffect(() => {
+    if (!open) return;
+    void refreshVoicePack();
+    let unlisten: (() => void) | undefined;
+    void listen<{ phase: string; received: number; total: number }>("voice-pack-progress", (e) => {
+      setVoiceProgress(e.payload);
+    }).then((fn) => {
+      unlisten = fn;
+    });
+    return () => unlisten?.();
+  }, [open, refreshVoicePack]);
 
   useEffect(() => {
     if (!open) return;
@@ -115,6 +147,35 @@ export function Settings() {
     if (shellPlatform === "windows") return t("settings.shellHintWindows");
     if (shellPlatform === "linux") return t("settings.shellHintLinux");
     return "";
+  }
+
+  async function downloadVoicePack() {
+    setVoiceBusy(true);
+    setVoiceError(null);
+    try {
+      await api.voicePackDownload();
+      await refreshVoicePack();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (msg !== "cancelled") setVoiceError(msg);
+      await refreshVoicePack();
+    } finally {
+      setVoiceBusy(false);
+      setVoiceProgress(null);
+    }
+  }
+
+  async function deleteVoicePack() {
+    setVoiceBusy(true);
+    setVoiceError(null);
+    try {
+      await api.voicePackDelete();
+      await refreshVoicePack();
+    } catch (e) {
+      setVoiceError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setVoiceBusy(false);
+    }
   }
 
   async function toggleShellNew(v: boolean) {
@@ -305,6 +366,58 @@ export function Settings() {
                     />
                   </div>
                   {shellError && <p className="settings-hint settings-error">{shellError}</p>}
+                </div>
+              </>
+            )}
+
+            {tab === "voice" && (
+              <>
+                <div className="field">
+                  <label>{t("settings.voiceStatus")}</label>
+                  <p className="settings-hint muted">{t("voice.privacyHint")}</p>
+                  <p className="settings-hint">
+                    {voicePack?.state === "ready"
+                      ? `${t("voice.packReady")}${voicePack.engine ? ` (${voicePack.engine})` : ""}`
+                      : voiceBusy || voicePack?.state === "downloading"
+                        ? t("voice.packDownloading")
+                        : t("voice.packMissing")}
+                    {voiceProgress &&
+                      voiceProgress.total > 0 &&
+                      ` · ${voiceProgress.phase} ${Math.min(
+                        100,
+                        Math.round((voiceProgress.received / voiceProgress.total) * 100),
+                      )}%`}
+                  </p>
+                  {voiceError && <p className="settings-hint settings-error">{voiceError}</p>}
+                  <div className="dialog-actions" style={{ justifyContent: "flex-start", marginTop: 8 }}>
+                    {voiceBusy ? (
+                      <button
+                        type="button"
+                        className="btn"
+                        onClick={() => void api.voicePackCancelDownload()}
+                      >
+                        {t("voice.cancelDownload")}
+                      </button>
+                    ) : voicePack?.state === "ready" ? (
+                      <button
+                        type="button"
+                        className="btn"
+                        disabled={voiceBusy}
+                        onClick={() => void deleteVoicePack()}
+                      >
+                        {t("voice.deletePack")}
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        className="btn primary"
+                        disabled={voiceBusy}
+                        onClick={() => void downloadVoicePack()}
+                      >
+                        {t("voice.download")}
+                      </button>
+                    )}
+                  </div>
                 </div>
               </>
             )}
