@@ -36,20 +36,40 @@ pnpm tauri build            # 产出当前平台安装包
 pnpm tauri build --debug --no-bundle
 ```
 
+产物目录：`src-tauri/target/release/bundle/`。
+
+> 构建需要 Rust 工具链与各平台 WebView 运行时（macOS 自带；Linux 需 `webkit2gtk`；Windows 自带 WebView2）。
+>
+> 重新生成应用图标：`pnpm icon`
+
+## 发布
+
+版本号需在以下三处保持一致：
+
+- `package.json`
+- `src-tauri/Cargo.toml`
+- `src-tauri/tauri.conf.json`
+
+推送 `v*` tag 会触发 GitHub Actions，构建 macOS（arm64 / x64）、Windows、Linux x64 安装包并写入 [GitHub Releases](https://github.com/ZturnLibs/jotpad/releases)：
+
+```bash
+# 确认三处 version 已更新，例如 0.1.1
+git tag v0.1.1
+git push origin v0.1.1
+```
+
+也可在 Actions 页手动运行 `release` workflow。关于对话框版本来自 `tauri.conf.json`（`getVersion()`）。
+
 ### 发布前检查清单
 
 - [ ] `pnpm test` 与 `pnpm build` 通过
-- [ ] `pnpm tauri build` 在目标平台成功
+- [ ] `pnpm tauri build` 在目标平台成功（或等待 CI Release 产物）
 - [ ] macOS：系统菜单、Overlay 标题栏拖拽、红绿灯安全区
 - [ ] Windows：窗口菜单栏、字体/对话框、新建窗口无 Overlay 异常
 - [ ] Linux：GTK 菜单条、webkit2gtk 依赖说明
 - [ ] 打开 / 保存 / 另存为 / 重命名 / 最近文件
 - [ ] 外部修改文件后的重新加载提示
 - [ ] 未保存关闭 / 退出确认与草稿恢复
-
-> 构建需要 Rust 工具链与各平台 WebView 运行时（macOS 自带；Linux 需 `webkit2gtk`；Windows 自带 WebView2）。
->
-> 重新生成应用图标：`pnpm icon`
 
 ## 快捷键
 
