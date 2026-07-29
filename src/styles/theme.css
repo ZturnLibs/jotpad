@@ -36,8 +36,9 @@
   --editor-bg: #ffffff;
   --editor-text: #1a1a1a;
   --editor-caret: #1a1a1a;
+  --editor-caret-width: 1.5px;
   --editor-selection: #bee0fd;
-  --editor-line: rgba(0, 0, 0, 0.08);
+  --editor-line: rgba(0, 0, 0, 0.06);
   --match: rgba(255, 213, 79, 0.55);
   --match-current: rgba(255, 179, 0, 0.85);
   --scrollbar: rgba(0, 0, 0, 0.28);
@@ -68,11 +69,13 @@
   --border-strong: #4a4a4a;
   --shadow-pop: 0 8px 24px rgba(0, 0, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.4);
   --shadow-bar: 0 1px 0 rgba(0, 0, 0, 0.4);
-  --editor-bg: #1f1f1f;
-  --editor-text: #f0f0f0;
-  --editor-caret: #f0f0f0;
-  --editor-selection: #264f78;
-  --editor-line: rgba(255, 255, 255, 0.06);
+  /* 编辑器：光标用强调色，选中行用中性冷灰，避免与光标抢对比度 */
+  --editor-bg: #1a1b1d;
+  --editor-text: #ececec;
+  --editor-caret: #5adbff;
+  --editor-caret-width: 2px;
+  --editor-selection: #1e4f7a;
+  --editor-line: #26292e;
   --match: rgba(140, 99, 0, 0.85);
   --match-current: rgba(255, 209, 102, 0.95);
   --scrollbar: rgba(255, 255, 255, 0.22);

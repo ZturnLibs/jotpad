@@ -44,6 +44,7 @@ export function App() {
   const recentLen = useStore((s) => s.recentFiles.length);
   const sessionsLen = useStore((s) => s.sessions.length);
   const alwaysOnTop = useStore((s) => s.alwaysOnTop);
+  const settingsOpen = useStore((s) => s.settingsOpen);
   const activeTab = useStore((s) => s.tabs.find((t) => t.id === s.activeTabId));
   const t = useT();
 
@@ -307,20 +308,24 @@ export function App() {
 
   return (
     <div className="app">
-      <div className="app-body">
-        <aside className="sidebar">
-          <TabBar />
-        </aside>
-        <main className="main">
-          <Toolbar />
-          <div className="editor-wrap-host" style={{ flex: 1, position: "relative", minHeight: 0 }}>
-            <Editor />
-            <FindBar />
-            <VoiceBar />
-          </div>
-          <StatusBar />
-        </main>
-      </div>
+      {settingsOpen ? (
+        <Settings />
+      ) : (
+        <div className="app-body">
+          <aside className="sidebar">
+            <TabBar />
+          </aside>
+          <main className="main">
+            <Toolbar />
+            <div className="editor-wrap-host" style={{ flex: 1, position: "relative", minHeight: 0 }}>
+              <Editor />
+              <FindBar />
+              <VoiceBar />
+            </div>
+            <StatusBar />
+          </main>
+        </div>
+      )}
       <ContextMenu />
       <QuickOpen />
       <ConfirmDialog />
@@ -329,7 +334,6 @@ export function App() {
       <GotoDialog />
       <VoiceSetupDialog />
       <PageSetup />
-      <Settings />
       <About />
       <HistoryPanel />
       <ToastHost />

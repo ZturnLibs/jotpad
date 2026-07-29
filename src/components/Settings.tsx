@@ -5,6 +5,7 @@ import { useT } from "@/lib/i18n";
 import { ACCENT_PRESETS, FONT_PRESETS, type Locale, type StartupMode, type ThemeMode } from "@/types";
 import { clamp } from "@/lib/utils";
 import * as api from "@/lib/backend";
+import { Icon } from "./icons";
 
 type SettingsTab = "appearance" | "editor" | "general" | "voice";
 
@@ -72,8 +73,8 @@ function Toggle({
   );
 }
 
+/** 全屏设置页：左栏导航 + 返回，右栏配置详情。 */
 export function Settings() {
-  const open = useStore((s) => s.settingsOpen);
   const setOpen = useStore((s) => s.setSettingsOpen);
   const settings = useStore((s) => s.settings);
   const setSettings = useStore((s) => s.setSettings);
@@ -97,8 +98,7 @@ export function Settings() {
   const [systemDocumentsDir, setSystemDocumentsDir] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!open) return;
-    // 仅在打开面板时定位；避免清掉 focus 后又把 tab 打回外观
+    // 进入设置页时按 focus 定位分区；默认外观
     const focus = useStore.getState().settingsFocus;
     if (focus === "voice") {
       setTab("voice");
@@ -106,10 +106,9 @@ export function Settings() {
     } else {
       setTab("appearance");
     }
-  }, [open, setSettingsFocus]);
+  }, [setSettingsFocus]);
 
   useEffect(() => {
-    if (!open) return;
     let cancelled = false;
     void api
       .documentsDir()
@@ -122,10 +121,9 @@ export function Settings() {
     return () => {
       cancelled = true;
     };
-  }, [open]);
+  }, []);
 
   useEffect(() => {
-    if (!open) return;
     void refreshVoicePack();
     let unlisten: (() => void) | undefined;
     void listen<{ phase: string; received: number; total: number }>("voice-pack-progress", (e) => {
@@ -134,10 +132,9 @@ export function Settings() {
       unlisten = fn;
     });
     return () => unlisten?.();
-  }, [open, refreshVoicePack]);
+  }, [refreshVoicePack]);
 
   useEffect(() => {
-    if (!open) return;
     let cancelled = false;
     void (async () => {
       try {
@@ -157,13 +154,17 @@ export function Settings() {
     return () => {
       cancelled = true;
     };
-  }, [open, t]);
+  }, [t]);
 
   function shellPlatformHint(): string {
     if (shellPlatform === "macos") return t("settings.shellHintMac");
     if (shellPlatform === "windows") return t("settings.shellHintWindows");
     if (shellPlatform === "linux") return t("settings.shellHintLinux");
     return "";
+  }
+
+  function closeSettings() {
+    setOpen(false);
   }
 
   async function downloadVoicePack() {
@@ -224,8 +225,7 @@ export function Settings() {
   }
 
   async function chooseDefaultSaveDirectory() {
-    const start =
-      settings.defaultSaveDirectory || systemDocumentsDir || undefined;
+    const start = settings.defaultSaveDirectory || systemDocumentsDir || undefined;
     const dir = await api.pickDirectory(start);
     if (!dir) return;
     setSettings({ defaultSaveDirectory: dir });
@@ -237,292 +237,293 @@ export function Settings() {
     await useStore.getState().persist();
   }
 
-  if (!open) return null;
+  const activeTabLabel = t(TABS.find((item) => item.id === tab)?.labelKey ?? "settings.title");
 
   return (
-    <div className="overlay" onMouseDown={(e) => e.target === e.currentTarget && setOpen(false)}>
-      <div className="dialog settings" role="dialog" aria-modal="true" aria-label={t("settings.title")}>
-        <h3>{t("settings.title")}</h3>
+    <div className="settings-page" role="main" aria-label={t("settings.title")}>
+      <div className="settings-drag" data-tauri-drag-region />
+      <aside className="settings-sidebar">
+        <button type="button" className="settings-back" onClick={closeSettings}>
+          <Icon name="chevronLeft" size={16} />
+          <span>{t("settings.back")}</span>
+        </button>
+        <h1 className="settings-sidebar-title">{t("settings.title")}</h1>
+        <nav className="settings-nav" aria-label={t("settings.title")}>
+          {TABS.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              className={"settings-nav-item" + (tab === item.id ? " active" : "")}
+              aria-current={tab === item.id ? "page" : undefined}
+              onClick={() => setTab(item.id)}
+            >
+              {t(item.labelKey)}
+            </button>
+          ))}
+        </nav>
+      </aside>
 
-        <div className="settings-body">
-          <nav className="settings-nav" aria-label={t("settings.title")}>
-            {TABS.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                className={"settings-nav-item" + (tab === item.id ? " active" : "")}
-                aria-current={tab === item.id ? "page" : undefined}
-                onClick={() => setTab(item.id)}
-              >
-                {t(item.labelKey)}
-              </button>
-            ))}
-          </nav>
+      <section className="settings-content">
+        <header className="settings-content-header">
+          <h2>{activeTabLabel}</h2>
+        </header>
+        <div className="settings-panel">
+          {tab === "appearance" && (
+            <>
+              <div className="field">
+                <label>{t("view.theme")}</label>
+                <Segmented<ThemeMode>
+                  value={settings.theme}
+                  onChange={(v) => setSettings({ theme: v })}
+                  options={[
+                    { value: "light", label: t("view.themeLight") },
+                    { value: "dark", label: t("view.themeDark") },
+                    { value: "system", label: t("view.themeSystem") },
+                  ]}
+                />
+              </div>
+              <div className="field">
+                <label>{t("settings.accent")}</label>
+                <div className="swatches">
+                  {ACCENT_PRESETS.map((c) => (
+                    <button
+                      key={c}
+                      className={"swatch" + (settings.accent === c ? " active" : "")}
+                      title={c === "system" ? t("view.themeSystem") : c}
+                      style={
+                        c === "system"
+                          ? { background: "linear-gradient(135deg,#2AA8FF,#6750A4)" }
+                          : { background: c }
+                      }
+                      onClick={() => setSettings({ accent: c })}
+                      aria-label={c}
+                    />
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
 
-          <div className="settings-panel">
-            {tab === "appearance" && (
-              <>
-                <div className="field">
-                  <label>{t("view.theme")}</label>
-                  <Segmented<ThemeMode>
-                    value={settings.theme}
-                    onChange={(v) => setSettings({ theme: v })}
-                    options={[
-                      { value: "light", label: t("view.themeLight") },
-                      { value: "dark", label: t("view.themeDark") },
-                      { value: "system", label: t("view.themeSystem") },
-                    ]}
-                  />
-                </div>
-                <div className="field">
-                  <label>{t("settings.accent")}</label>
-                  <div className="swatches">
-                    {ACCENT_PRESETS.map((c) => (
-                      <button
-                        key={c}
-                        className={"swatch" + (settings.accent === c ? " active" : "")}
-                        title={c === "system" ? t("view.themeSystem") : c}
-                        style={
-                          c === "system"
-                            ? { background: "linear-gradient(135deg,#2AA8FF,#6750A4)" }
-                            : { background: c }
-                        }
-                        onClick={() => setSettings({ accent: c })}
-                        aria-label={c}
-                      />
-                    ))}
-                  </div>
-                </div>
-              </>
-            )}
+          {tab === "editor" && (
+            <>
+              <div className="field">
+                <label>{t("settings.font")}</label>
+                <select
+                  value={settings.fontFamily}
+                  onChange={(e) => setSettings({ fontFamily: e.target.value })}
+                >
+                  {FONT_PRESETS.map((f) => (
+                    <option key={f} value={f} style={{ fontFamily: f }}>
+                      {firstName(f)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="field">
+                <label>{t("settings.fontSize")}</label>
+                <input
+                  type="number"
+                  min={8}
+                  max={72}
+                  value={settings.fontSize}
+                  onChange={(e) =>
+                    setSettings({ fontSize: clamp(parseInt(e.target.value) || 8, 8, 72) })
+                  }
+                />
+              </div>
+              <div className="settings-toggles">
+                <Toggle
+                  on={settings.wordWrap}
+                  onChange={(v) => setSettings({ wordWrap: v })}
+                  label={t("settings.wordWrap")}
+                />
+                <Toggle
+                  on={settings.showLineNumbers}
+                  onChange={(v) => setSettings({ showLineNumbers: v })}
+                  label={t("settings.lineNumbers")}
+                />
+                <Toggle
+                  on={settings.spellCheck}
+                  onChange={(v) => setSettings({ spellCheck: v })}
+                  label={t("settings.spellCheck")}
+                />
+              </div>
+              <p className="settings-hint muted">{t("settings.spellCheckHint")}</p>
+            </>
+          )}
 
-            {tab === "editor" && (
-              <>
-                <div className="field">
-                  <label>{t("settings.font")}</label>
-                  <select
-                    value={settings.fontFamily}
-                    onChange={(e) => setSettings({ fontFamily: e.target.value })}
-                  >
-                    {FONT_PRESETS.map((f) => (
-                      <option key={f} value={f} style={{ fontFamily: f }}>
-                        {firstName(f)}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="field">
-                  <label>{t("settings.fontSize")}</label>
-                  <input
-                    type="number"
-                    min={8}
-                    max={72}
-                    value={settings.fontSize}
-                    onChange={(e) =>
-                      setSettings({ fontSize: clamp(parseInt(e.target.value) || 8, 8, 72) })
-                    }
-                  />
-                </div>
-                <div className="settings-toggles">
-                  <Toggle
-                    on={settings.wordWrap}
-                    onChange={(v) => setSettings({ wordWrap: v })}
-                    label={t("settings.wordWrap")}
-                  />
-                  <Toggle
-                    on={settings.showLineNumbers}
-                    onChange={(v) => setSettings({ showLineNumbers: v })}
-                    label={t("settings.lineNumbers")}
-                  />
-                  <Toggle
-                    on={settings.spellCheck}
-                    onChange={(v) => setSettings({ spellCheck: v })}
-                    label={t("settings.spellCheck")}
-                  />
-                </div>
-                <p className="settings-hint muted">{t("settings.spellCheckHint")}</p>
-              </>
-            )}
-
-            {tab === "general" && (
-              <>
-                <div className="field">
-                  <label>{t("settings.language")}</label>
-                  <Segmented<Locale>
-                    value={settings.locale}
-                    onChange={(v) => setSettings({ locale: v })}
-                    options={[
-                      { value: "zh-CN", label: "中文（简体）" },
-                      { value: "en", label: "English" },
-                    ]}
-                  />
-                </div>
-                <div className="settings-toggles">
-                  <Toggle
-                    on={settings.showStatusBar}
-                    onChange={(v) => setSettings({ showStatusBar: v })}
-                    label={t("settings.showStatusBar")}
-                  />
-                  <Toggle
-                    on={settings.autoCheckUpdates}
-                    onChange={(v) => {
-                      setSettings({ autoCheckUpdates: v });
-                      void useStore.getState().persist();
-                    }}
-                    label={t("settings.autoCheckUpdates")}
-                  />
-                  <Toggle
-                    on={settings.localHistoryEnabled}
-                    onChange={(v) => {
-                      setSettings({ localHistoryEnabled: v });
-                      void useStore.getState().persist();
-                    }}
-                    label={t("settings.localHistory")}
-                  />
-                </div>
-                <div className="field" style={{ marginTop: 12 }}>
-                  <label>{t("settings.startup")}</label>
-                  <Segmented<StartupMode>
-                    value={settings.startupMode}
-                    onChange={(v) => setSettings({ startupMode: v })}
-                    options={[
-                      { value: "restore", label: t("settings.startupRestore") },
-                      { value: "blank", label: t("settings.startupBlank") },
-                    ]}
-                  />
-                  <p className="settings-hint muted">{t("settings.startupHint")}</p>
-                </div>
-                <div className="field" style={{ marginTop: 12 }}>
-                  <label>{t("settings.defaultSaveDirectory")}</label>
-                  <div
-                    className="menu-row"
+          {tab === "general" && (
+            <>
+              <div className="field">
+                <label>{t("settings.language")}</label>
+                <Segmented<Locale>
+                  value={settings.locale}
+                  onChange={(v) => setSettings({ locale: v })}
+                  options={[
+                    { value: "zh-CN", label: "中文（简体）" },
+                    { value: "en", label: "English" },
+                  ]}
+                />
+              </div>
+              <div className="settings-toggles">
+                <Toggle
+                  on={settings.showStatusBar}
+                  onChange={(v) => setSettings({ showStatusBar: v })}
+                  label={t("settings.showStatusBar")}
+                />
+                <Toggle
+                  on={settings.autoCheckUpdates}
+                  onChange={(v) => {
+                    setSettings({ autoCheckUpdates: v });
+                    void useStore.getState().persist();
+                  }}
+                  label={t("settings.autoCheckUpdates")}
+                />
+                <Toggle
+                  on={settings.localHistoryEnabled}
+                  onChange={(v) => {
+                    setSettings({ localHistoryEnabled: v });
+                    void useStore.getState().persist();
+                  }}
+                  label={t("settings.localHistory")}
+                />
+              </div>
+              <div className="field" style={{ marginTop: 12 }}>
+                <label>{t("settings.startup")}</label>
+                <Segmented<StartupMode>
+                  value={settings.startupMode}
+                  onChange={(v) => setSettings({ startupMode: v })}
+                  options={[
+                    { value: "restore", label: t("settings.startupRestore") },
+                    { value: "blank", label: t("settings.startupBlank") },
+                  ]}
+                />
+                <p className="settings-hint muted">{t("settings.startupHint")}</p>
+              </div>
+              <div className="field" style={{ marginTop: 12 }}>
+                <label>{t("settings.defaultSaveDirectory")}</label>
+                <div
+                  className="menu-row"
+                  style={{
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 12,
+                    borderRadius: 6,
+                    padding: "10px 12px",
+                    background: "var(--bg)",
+                    border: "1px solid var(--border)",
+                  }}
+                >
+                  <span
+                    className="muted"
                     style={{
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      gap: 12,
-                      borderRadius: 6,
-                      padding: "10px 12px",
-                      background: "var(--bg)",
-                      border: "1px solid var(--border)",
+                      flex: 1,
+                      minWidth: 0,
+                      wordBreak: "break-all",
+                      fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
                     }}
                   >
-                    <span
-                      className="muted"
-                      style={{
-                        flex: 1,
-                        minWidth: 0,
-                        wordBreak: "break-all",
-                        fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
-                      }}
+                    {settings.defaultSaveDirectory ||
+                      systemDocumentsDir ||
+                      t("settings.systemDocuments")}
+                  </span>
+                  <div className="dialog-actions" style={{ justifyContent: "flex-start" }}>
+                    <button type="button" className="btn" onClick={() => void chooseDefaultSaveDirectory()}>
+                      {t("settings.chooseDirectory")}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn"
+                      disabled={!settings.defaultSaveDirectory}
+                      onClick={() => void resetDefaultSaveDirectory()}
                     >
-                      {settings.defaultSaveDirectory ||
-                        systemDocumentsDir ||
-                        t("settings.systemDocuments")}
-                    </span>
-                    <div className="dialog-actions" style={{ justifyContent: "flex-start" }}>
-                      <button type="button" className="btn" onClick={() => void chooseDefaultSaveDirectory()}>
-                        {t("settings.chooseDirectory")}
-                      </button>
-                      <button
-                        type="button"
-                        className="btn"
-                        disabled={!settings.defaultSaveDirectory}
-                        onClick={() => void resetDefaultSaveDirectory()}
-                      >
-                        {t("settings.resetDirectory")}
-                      </button>
-                    </div>
+                      {t("settings.resetDirectory")}
+                    </button>
                   </div>
-                  {!settings.defaultSaveDirectory ? (
-                    <p className="settings-hint muted">{t("settings.systemDocuments")}</p>
-                  ) : null}
-                  <p className="settings-hint muted">{t("settings.defaultSaveDirectoryHint")}</p>
                 </div>
-                <div className="field" style={{ marginTop: 12 }}>
-                  <label>{t("settings.system")}</label>
-                  <p className="settings-hint muted">{t("settings.shellHint")}</p>
-                  {shellPlatformHint() && (
-                    <p className="settings-hint muted">{shellPlatformHint()}</p>
+                {!settings.defaultSaveDirectory ? (
+                  <p className="settings-hint muted">{t("settings.systemDocuments")}</p>
+                ) : null}
+                <p className="settings-hint muted">{t("settings.defaultSaveDirectoryHint")}</p>
+              </div>
+              <div className="field" style={{ marginTop: 12 }}>
+                <label>{t("settings.system")}</label>
+                <p className="settings-hint muted">{t("settings.shellHint")}</p>
+                {shellPlatformHint() && (
+                  <p className="settings-hint muted">{shellPlatformHint()}</p>
+                )}
+                <div className="settings-toggles">
+                  <Toggle
+                    on={shellNew}
+                    onChange={(v) => void toggleShellNew(v)}
+                    label={t("settings.shellNewTextFile")}
+                    disabled={shellBusy}
+                  />
+                  <Toggle
+                    on={shellOpen}
+                    onChange={(v) => void toggleShellOpen(v)}
+                    label={t("settings.shellOpenWith")}
+                    disabled={shellBusy}
+                  />
+                </div>
+                {shellError && <p className="settings-hint settings-error">{shellError}</p>}
+              </div>
+            </>
+          )}
+
+          {tab === "voice" && (
+            <>
+              <div className="field">
+                <label>{t("settings.voiceStatus")}</label>
+                <p className="settings-hint muted">{t("voice.privacyHint")}</p>
+                <p className="settings-hint">
+                  {voicePack?.state === "ready"
+                    ? `${t("voice.packReady")}${voicePack.engine ? ` (${voicePack.engine})` : ""}`
+                    : voiceBusy || voicePack?.state === "downloading"
+                      ? t("voice.packDownloading")
+                      : t("voice.packMissing")}
+                  {voiceProgress &&
+                    voiceProgress.total > 0 &&
+                    ` · ${voiceProgress.phase} ${Math.min(
+                      100,
+                      Math.round((voiceProgress.received / voiceProgress.total) * 100),
+                    )}%`}
+                </p>
+                {voiceError && <p className="settings-hint settings-error">{voiceError}</p>}
+                <div className="dialog-actions" style={{ justifyContent: "flex-start", marginTop: 8 }}>
+                  {voiceBusy ? (
+                    <button
+                      type="button"
+                      className="btn"
+                      onClick={() => void api.voicePackCancelDownload()}
+                    >
+                      {t("voice.cancelDownload")}
+                    </button>
+                  ) : voicePack?.state === "ready" ? (
+                    <button
+                      type="button"
+                      className="btn"
+                      disabled={voiceBusy}
+                      onClick={() => void deleteVoicePack()}
+                    >
+                      {t("voice.deletePack")}
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="btn primary"
+                      disabled={voiceBusy}
+                      onClick={() => void downloadVoicePack()}
+                    >
+                      {t("voice.download")}
+                    </button>
                   )}
-                  <div className="settings-toggles">
-                    <Toggle
-                      on={shellNew}
-                      onChange={(v) => void toggleShellNew(v)}
-                      label={t("settings.shellNewTextFile")}
-                      disabled={shellBusy}
-                    />
-                    <Toggle
-                      on={shellOpen}
-                      onChange={(v) => void toggleShellOpen(v)}
-                      label={t("settings.shellOpenWith")}
-                      disabled={shellBusy}
-                    />
-                  </div>
-                  {shellError && <p className="settings-hint settings-error">{shellError}</p>}
                 </div>
-              </>
-            )}
-
-            {tab === "voice" && (
-              <>
-                <div className="field">
-                  <label>{t("settings.voiceStatus")}</label>
-                  <p className="settings-hint muted">{t("voice.privacyHint")}</p>
-                  <p className="settings-hint">
-                    {voicePack?.state === "ready"
-                      ? `${t("voice.packReady")}${voicePack.engine ? ` (${voicePack.engine})` : ""}`
-                      : voiceBusy || voicePack?.state === "downloading"
-                        ? t("voice.packDownloading")
-                        : t("voice.packMissing")}
-                    {voiceProgress &&
-                      voiceProgress.total > 0 &&
-                      ` · ${voiceProgress.phase} ${Math.min(
-                        100,
-                        Math.round((voiceProgress.received / voiceProgress.total) * 100),
-                      )}%`}
-                  </p>
-                  {voiceError && <p className="settings-hint settings-error">{voiceError}</p>}
-                  <div className="dialog-actions" style={{ justifyContent: "flex-start", marginTop: 8 }}>
-                    {voiceBusy ? (
-                      <button
-                        type="button"
-                        className="btn"
-                        onClick={() => void api.voicePackCancelDownload()}
-                      >
-                        {t("voice.cancelDownload")}
-                      </button>
-                    ) : voicePack?.state === "ready" ? (
-                      <button
-                        type="button"
-                        className="btn"
-                        disabled={voiceBusy}
-                        onClick={() => void deleteVoicePack()}
-                      >
-                        {t("voice.deletePack")}
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        className="btn primary"
-                        disabled={voiceBusy}
-                        onClick={() => void downloadVoicePack()}
-                      >
-                        {t("voice.download")}
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
+              </div>
+            </>
+          )}
         </div>
-
-        <div className="dialog-actions">
-          <button className="btn primary" onClick={() => setOpen(false)}>
-            {t("settings.done")}
-          </button>
-        </div>
-      </div>
+      </section>
     </div>
   );
 }

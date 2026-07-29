@@ -32,6 +32,34 @@ import {
 const STATE_VERSION = 2;
 const MAX_RECENT = 20;
 const MAX_SESSIONS = 20;
+/** 自己写入后忽略外部变更检测的宽限期（Documents/iCloud 等可能立刻再改 mtime）。 */
+const SELF_WRITE_GRACE_MS = 4000;
+
+/** path → 最近一次由本应用写入的时间戳 */
+const recentSelfWrites = new Map<string, number>();
+/** 原生打开/保存对话框打开期间，暂停外部变更检测（避免失焦误报）。 */
+let nativeFileDialogDepth = 0;
+
+function markSelfWrite(path: string): void {
+  recentSelfWrites.set(path, Date.now());
+}
+
+function isRecentSelfWrite(path: string): boolean {
+  const at = recentSelfWrites.get(path);
+  if (at == null) return false;
+  if (Date.now() - at <= SELF_WRITE_GRACE_MS) return true;
+  recentSelfWrites.delete(path);
+  return false;
+}
+
+async function withNativeFileDialog<T>(fn: () => Promise<T>): Promise<T> {
+  nativeFileDialogDepth += 1;
+  try {
+    return await fn();
+  } finally {
+    nativeFileDialogDepth -= 1;
+  }
+}
 
 export type MenuKind = "file" | "edit" | "view" | null;
 
@@ -234,6 +262,8 @@ async function doWrite(tab: TabState, path: string): Promise<{ size: number; mti
   await api.writeFile(path, tab.content, tab.encoding, tab.lineEnding, tab.hasBom);
   const size = new TextEncoder().encode(tab.content).length;
   const mtime = await api.fileMtime(path);
+  // 标记为自己写入，避免保存对话框关闭后的 focus/轮询把本次写入当成外部修改
+  markSelfWrite(path);
   return { size, mtime };
 }
 
@@ -481,7 +511,7 @@ export const useStore = create<Store>((set, get) => ({
   },
 
   openDialog: async () => {
-    const path = await api.pickOpenFile();
+    const path = await withNativeFileDialog(() => api.pickOpenFile());
     if (!path) return;
     await get().openPath(path);
   },
@@ -492,7 +522,16 @@ export const useStore = create<Store>((set, get) => ({
     if (!tab.filePath) return get().saveAsTab(id);
     try {
       const { size, mtime } = await doWrite(tab, tab.filePath);
-      get().updateTab(id, { dirty: false, size, diskMtimeMs: mtime });
+      // 同路径可能被多个标签打开：统一刷新 mtime，避免另一标签误报外部变更
+      set((s) => ({
+        tabs: s.tabs.map((t) =>
+          t.id === id
+            ? { ...t, dirty: false, size, diskMtimeMs: mtime }
+            : t.filePath === tab.filePath
+              ? { ...t, diskMtimeMs: mtime }
+              : t,
+        ),
+      }));
       const { recordLocalHistory } = await import("@/lib/history");
       recordLocalHistory(tab.filePath, tab.content, "save");
       return true;
@@ -514,18 +553,25 @@ export const useStore = create<Store>((set, get) => ({
       const dir = await api.resolveDefaultSaveDirectory(settings.defaultSaveDirectory);
       if (dir) defaultPath = joinPath(dir, defaultName);
     }
-    const path = await api.pickSaveFile(defaultPath);
+    const path = await withNativeFileDialog(() => api.pickSaveFile(defaultPath));
     if (!path) return false;
     try {
       const { size, mtime } = await doWrite(tab, path);
-      get().updateTab(id, {
-        filePath: path,
-        title: basename(path),
-        dirty: false,
-        size,
-        diskMtimeMs: mtime,
-      });
       set((s) => ({
+        tabs: s.tabs.map((t) =>
+          t.id === id
+            ? {
+                ...t,
+                filePath: path,
+                title: basename(path),
+                dirty: false,
+                size,
+                diskMtimeMs: mtime,
+              }
+            : t.filePath === path
+              ? { ...t, diskMtimeMs: mtime }
+              : t,
+        ),
         recentFiles: [path, ...s.recentFiles.filter((p) => p !== path)].slice(0, MAX_RECENT),
       }));
       const { recordLocalHistory } = await import("@/lib/history");
@@ -768,14 +814,25 @@ export const useStore = create<Store>((set, get) => ({
 
   checkExternalChanges: async () => {
     if (get().reloadPrompt) return;
+    // 原生文件对话框打开时窗口会失焦，此时检测容易误报
+    if (nativeFileDialogDepth > 0) return;
     for (const tab of get().tabs) {
       if (!tab.filePath || tab.diskMtimeMs == null) continue;
       try {
         const m = await api.fileMtime(tab.filePath);
-        if (m !== tab.diskMtimeMs) {
-          set({ reloadPrompt: { tabId: tab.id, path: tab.filePath } });
-          return;
+        if (m === tab.diskMtimeMs) continue;
+        // 自己刚保存，或保存后同步层再次触碰文件：只刷新基准
+        if (isRecentSelfWrite(tab.filePath)) {
+          const path = tab.filePath;
+          set((s) => ({
+            tabs: s.tabs.map((t) =>
+              t.filePath === path ? { ...t, diskMtimeMs: m } : t,
+            ),
+          }));
+          continue;
         }
+        set({ reloadPrompt: { tabId: tab.id, path: tab.filePath } });
+        return;
       } catch {
         /* file missing — ignore until user interacts */
       }
@@ -840,7 +897,11 @@ export const useStore = create<Store>((set, get) => ({
   setReplaceOpen: (v) => set({ replaceOpen: v, findOpen: v ? true : get().findOpen }),
   setGotoOpen: (v) => set({ gotoOpen: v }),
   setQuickOpenOpen: (v) => set({ quickOpenOpen: v }),
-  setSettingsOpen: (v) => set({ settingsOpen: v }),
+  setSettingsOpen: (v) => {
+    set({ settingsOpen: v });
+    // 离开设置页时落盘，避免仅改设置未触发其他 persist 时丢失
+    if (!v) void get().persist();
+  },
   setAboutOpen: (v) => set({ aboutOpen: v }),
   setPageSetupOpen: (v) => set({ pageSetupOpen: v }),
   setSessionNameOpen: (v) => set({ sessionNameOpen: v }),
