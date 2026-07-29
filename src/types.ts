@@ -85,6 +85,8 @@ export interface AppSettings {
   skippedUpdateVersion: string | null;
   /** 保存时写入本地历史快照（默认开）。 */
   localHistoryEnabled: boolean;
+  /** 自定义默认保存目录；null 表示使用系统「文档」目录。 */
+  defaultSaveDirectory: string | null;
 }
 
 export interface AppState {
@@ -111,6 +113,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   autoCheckUpdates: true,
   skippedUpdateVersion: null,
   localHistoryEnabled: true,
+  defaultSaveDirectory: null,
 };
 
 /** Accent color presets shown in Settings. "system" follows the OS accent. */

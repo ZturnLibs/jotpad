@@ -184,6 +184,10 @@ function normalizeSettings(raw: Partial<AppSettings> & Record<string, unknown>):
     typeof merged.skippedUpdateVersion === "string" && merged.skippedUpdateVersion
       ? merged.skippedUpdateVersion
       : null;
+  const defaultSaveDirectory =
+    typeof merged.defaultSaveDirectory === "string" && merged.defaultSaveDirectory.trim()
+      ? merged.defaultSaveDirectory
+      : null;
   return {
     theme: merged.theme,
     locale: merged.locale,
@@ -199,6 +203,7 @@ function normalizeSettings(raw: Partial<AppSettings> & Record<string, unknown>):
     autoCheckUpdates: merged.autoCheckUpdates !== false,
     skippedUpdateVersion: skipped,
     localHistoryEnabled: merged.localHistoryEnabled !== false,
+    defaultSaveDirectory,
   };
 }
 
@@ -500,9 +505,16 @@ export const useStore = create<Store>((set, get) => ({
   saveAsTab: async (id) => {
     const tab = get().tabs.find((t) => t.id === id);
     if (!tab) return false;
-    const untitled = get().settings.locale === "zh-CN" ? "新建.txt" : "Untitled.txt";
+    const settings = get().settings;
+    const untitled = settings.locale === "zh-CN" ? "新建.txt" : "Untitled.txt";
     const defaultName = tab.filePath ? basename(tab.filePath) : untitled;
-    const path = await api.pickSaveFile(defaultName);
+    // 未保存标签：自定义目录优先，否则落到各系统「文档」目录
+    let defaultPath = tab.filePath ?? defaultName;
+    if (!tab.filePath) {
+      const dir = await api.resolveDefaultSaveDirectory(settings.defaultSaveDirectory);
+      if (dir) defaultPath = joinPath(dir, defaultName);
+    }
+    const path = await api.pickSaveFile(defaultPath);
     if (!path) return false;
     try {
       const { size, mtime } = await doWrite(tab, path);

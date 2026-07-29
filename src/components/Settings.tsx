@@ -94,6 +94,7 @@ export function Settings() {
     total: number;
   } | null>(null);
   const [voiceError, setVoiceError] = useState<string | null>(null);
+  const [systemDocumentsDir, setSystemDocumentsDir] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -106,6 +107,22 @@ export function Settings() {
       setTab("appearance");
     }
   }, [open, setSettingsFocus]);
+
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    void api
+      .documentsDir()
+      .then((dir) => {
+        if (!cancelled) setSystemDocumentsDir(dir);
+      })
+      .catch(() => {
+        if (!cancelled) setSystemDocumentsDir(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -204,6 +221,20 @@ export function Settings() {
     } finally {
       setShellBusy(false);
     }
+  }
+
+  async function chooseDefaultSaveDirectory() {
+    const start =
+      settings.defaultSaveDirectory || systemDocumentsDir || undefined;
+    const dir = await api.pickDirectory(start);
+    if (!dir) return;
+    setSettings({ defaultSaveDirectory: dir });
+    await useStore.getState().persist();
+  }
+
+  async function resetDefaultSaveDirectory() {
+    setSettings({ defaultSaveDirectory: null });
+    await useStore.getState().persist();
   }
 
   if (!open) return null;
@@ -360,6 +391,52 @@ export function Settings() {
                     ]}
                   />
                   <p className="settings-hint muted">{t("settings.startupHint")}</p>
+                </div>
+                <div className="field" style={{ marginTop: 12 }}>
+                  <label>{t("settings.defaultSaveDirectory")}</label>
+                  <div
+                    className="menu-row"
+                    style={{
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: 12,
+                      borderRadius: 6,
+                      padding: "10px 12px",
+                      background: "var(--bg)",
+                      border: "1px solid var(--border)",
+                    }}
+                  >
+                    <span
+                      className="muted"
+                      style={{
+                        flex: 1,
+                        minWidth: 0,
+                        wordBreak: "break-all",
+                        fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+                      }}
+                    >
+                      {settings.defaultSaveDirectory ||
+                        systemDocumentsDir ||
+                        t("settings.systemDocuments")}
+                    </span>
+                    <div className="dialog-actions" style={{ justifyContent: "flex-start" }}>
+                      <button type="button" className="btn" onClick={() => void chooseDefaultSaveDirectory()}>
+                        {t("settings.chooseDirectory")}
+                      </button>
+                      <button
+                        type="button"
+                        className="btn"
+                        disabled={!settings.defaultSaveDirectory}
+                        onClick={() => void resetDefaultSaveDirectory()}
+                      >
+                        {t("settings.resetDirectory")}
+                      </button>
+                    </div>
+                  </div>
+                  {!settings.defaultSaveDirectory ? (
+                    <p className="settings-hint muted">{t("settings.systemDocuments")}</p>
+                  ) : null}
+                  <p className="settings-hint muted">{t("settings.defaultSaveDirectoryHint")}</p>
                 </div>
                 <div className="field" style={{ marginTop: 12 }}>
                   <label>{t("settings.system")}</label>

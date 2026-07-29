@@ -82,11 +82,43 @@ export async function pickOpenFile(): Promise<string | null> {
   return typeof result === "string" ? result : null;
 }
 
+/** Show the OS "choose directory" dialog. Returns a path or null. */
+export async function pickDirectory(defaultPath?: string): Promise<string | null> {
+  const result = await openDialog({
+    multiple: false,
+    directory: true,
+    title: "选择文件夹",
+    defaultPath,
+  });
+  if (!result) return null;
+  return typeof result === "string" ? result : null;
+}
+
+/** 系统「文档」目录绝对路径（各平台路径不同）。 */
+export function documentsDir(): Promise<string> {
+  return invoke<string>("documents_dir");
+}
+
+/**
+ * 解析首次保存用的默认目录：
+ * 有自定义路径用自定义；否则用系统文档目录。
+ */
+export async function resolveDefaultSaveDirectory(
+  override: string | null | undefined,
+): Promise<string | null> {
+  if (typeof override === "string" && override.trim()) return override;
+  try {
+    return await documentsDir();
+  } catch {
+    return null;
+  }
+}
+
 /** Show the OS "save file" dialog. Returns a path or null. */
-export async function pickSaveFile(defaultName?: string): Promise<string | null> {
+export async function pickSaveFile(defaultPath?: string): Promise<string | null> {
   return saveDialog({
     title: "另存为",
-    defaultPath: defaultName,
+    defaultPath,
   });
 }
 

@@ -295,6 +295,18 @@ fn current_exe_path() -> Result<String, String> {
         .map_err(|e| e.to_string())
 }
 
+/// 系统「文档」目录（macOS/Windows Documents；Linux 为 XDG Documents）。
+/// 解析失败时回退到用户主目录。
+#[tauri::command]
+fn documents_dir(app: tauri::AppHandle) -> Result<String, String> {
+    let resolver = app.path();
+    let path = resolver
+        .document_dir()
+        .or_else(|_| resolver.home_dir())
+        .map_err(|e| e.to_string())?;
+    Ok(path.to_string_lossy().into_owned())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let app = tauri::Builder::default()
@@ -316,6 +328,7 @@ pub fn run() {
             clipboard_write_text,
             get_system_accent,
             current_exe_path,
+            documents_dir,
             shell_integration::take_pending_open_paths,
             shell_integration::shell_integration_status,
             shell_integration::set_shell_new_text_file,
