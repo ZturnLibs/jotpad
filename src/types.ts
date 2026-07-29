@@ -83,6 +83,8 @@ export interface AppSettings {
   autoCheckUpdates: boolean;
   /** 用户选择跳过的远端版本号；再次出现同版本时启动检查不弹窗。 */
   skippedUpdateVersion: string | null;
+  /** 保存时写入本地历史快照（默认开）。 */
+  localHistoryEnabled: boolean;
 }
 
 export interface AppState {
@@ -108,6 +110,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   accent: "system",
   autoCheckUpdates: true,
   skippedUpdateVersion: null,
+  localHistoryEnabled: true,
 };
 
 /** Accent color presets shown in Settings. "system" follows the OS accent. */

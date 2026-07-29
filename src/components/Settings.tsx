@@ -340,6 +340,14 @@ export function Settings() {
                     }}
                     label={t("settings.autoCheckUpdates")}
                   />
+                  <Toggle
+                    on={settings.localHistoryEnabled}
+                    onChange={(v) => {
+                      setSettings({ localHistoryEnabled: v });
+                      void useStore.getState().persist();
+                    }}
+                    label={t("settings.localHistory")}
+                  />
                 </div>
                 <div className="field" style={{ marginTop: 12 }}>
                   <label>{t("settings.startup")}</label>

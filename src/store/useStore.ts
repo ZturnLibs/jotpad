@@ -63,6 +63,7 @@ interface Store {
   aboutOpen: boolean;
   pageSetupOpen: boolean;
   sessionNameOpen: boolean;
+  historyOpen: boolean;
   menuOpen: MenuKind;
   confirm: ConfirmState | null;
   reloadPrompt: ReloadPrompt | null;
@@ -129,6 +130,7 @@ interface Store {
   setAboutOpen: (v: boolean) => void;
   setPageSetupOpen: (v: boolean) => void;
   setSessionNameOpen: (v: boolean) => void;
+  setHistoryOpen: (v: boolean) => void;
   setMenuOpen: (m: MenuKind) => void;
   toggleAlwaysOnTop: () => Promise<void>;
   setVoiceOpen: (v: boolean) => void;
@@ -196,6 +198,7 @@ function normalizeSettings(raw: Partial<AppSettings> & Record<string, unknown>):
     accent: merged.accent,
     autoCheckUpdates: merged.autoCheckUpdates !== false,
     skippedUpdateVersion: skipped,
+    localHistoryEnabled: merged.localHistoryEnabled !== false,
   };
 }
 
@@ -277,6 +280,7 @@ export const useStore = create<Store>((set, get) => ({
   aboutOpen: false,
   pageSetupOpen: false,
   sessionNameOpen: false,
+  historyOpen: false,
   menuOpen: null,
   confirm: null,
   reloadPrompt: null,
@@ -484,6 +488,8 @@ export const useStore = create<Store>((set, get) => ({
     try {
       const { size, mtime } = await doWrite(tab, tab.filePath);
       get().updateTab(id, { dirty: false, size, diskMtimeMs: mtime });
+      const { recordLocalHistory } = await import("@/lib/history");
+      recordLocalHistory(tab.filePath, tab.content, "save");
       return true;
     } catch (e) {
       await api.nativeMessage("Jotpad", String(e));
@@ -510,6 +516,8 @@ export const useStore = create<Store>((set, get) => ({
       set((s) => ({
         recentFiles: [path, ...s.recentFiles.filter((p) => p !== path)].slice(0, MAX_RECENT),
       }));
+      const { recordLocalHistory } = await import("@/lib/history");
+      recordLocalHistory(path, tab.content, "saveAs");
       return true;
     } catch (e) {
       await api.nativeMessage("Jotpad", String(e));
@@ -528,6 +536,8 @@ export const useStore = create<Store>((set, get) => ({
         try {
           const { size, mtime } = await doWrite(tab, tab.filePath);
           get().updateTab(id, { dirty: false, size, diskMtimeMs: mtime });
+          const { recordLocalHistory } = await import("@/lib/history");
+          recordLocalHistory(tab.filePath, tab.content, "save");
         } catch (e) {
           await api.nativeMessage("Jotpad", String(e));
           return false;
@@ -822,6 +832,7 @@ export const useStore = create<Store>((set, get) => ({
   setAboutOpen: (v) => set({ aboutOpen: v }),
   setPageSetupOpen: (v) => set({ pageSetupOpen: v }),
   setSessionNameOpen: (v) => set({ sessionNameOpen: v }),
+  setHistoryOpen: (v) => set({ historyOpen: v }),
   setMenuOpen: (m) => set({ menuOpen: m }),
 
   toggleAlwaysOnTop: async () => {

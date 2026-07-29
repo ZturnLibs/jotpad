@@ -1,4 +1,5 @@
 // Jotpad backend: multi-encoding file I/O + persistent state (drafts/settings/recents).
+mod history;
 mod menu;
 mod shell_integration;
 mod voice;
@@ -325,6 +326,12 @@ pub fn run() {
             voice::voice_pack_delete,
             voice::voice_transcribe,
             voice::write_bytes,
+            history::history_put,
+            history::history_list,
+            history::history_get,
+            history::history_delete_entry,
+            history::history_clear,
+            history::history_diff,
         ])
         .on_menu_event(|app, event| menu::handle_event(app, event))
         .setup(|app| {

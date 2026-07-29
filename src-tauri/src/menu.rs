@@ -220,6 +220,7 @@ pub fn default_menu<R: Runtime, M: Manager<R>>(
             SEP,
             item("save", "保存", Some("CmdOrCtrl+S")),
             item("saveAs", "另存为…", Some("CmdOrCtrl+Shift+S")),
+            item("localHistory", "本地历史…", None),
             SEP,
             item("pageSetup", "页面设置…", None),
             item("print", "打印…", None),

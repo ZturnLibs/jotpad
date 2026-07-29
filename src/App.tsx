@@ -20,6 +20,7 @@ import { ContextMenu } from "@/components/ContextMenu";
 import { PageSetup } from "@/components/PageSetup";
 import { QuickOpen } from "@/components/QuickOpen";
 import { About, ConfirmDialog, GotoDialog, ReloadDialog, SessionNameDialog } from "@/components/Dialogs";
+import { HistoryPanel } from "@/components/HistoryPanel";
 import { ToastHost } from "@/components/ToastHost";
 
 function applyTheme(mode: "light" | "dark" | "system") {
@@ -330,6 +331,7 @@ export function App() {
       <PageSetup />
       <Settings />
       <About />
+      <HistoryPanel />
       <ToastHost />
     </div>
   );

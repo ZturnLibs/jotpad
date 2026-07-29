@@ -65,6 +65,7 @@ export function ConfirmDialog() {
 export function ReloadDialog() {
   const prompt = useStore((s) => s.reloadPrompt);
   const resolve = useStore((s) => s.resolveReloadPrompt);
+  const setHistoryOpen = useStore((s) => s.setHistoryOpen);
   const t = useT();
 
   if (!prompt) return null;
@@ -80,6 +81,14 @@ export function ReloadDialog() {
         <h3>{t("dialog.reloadTitle")}</h3>
         <p>{t("dialog.reloadMsg", { name })}</p>
         <div className="dialog-actions">
+          <button
+            className="btn"
+            onClick={() => {
+              setHistoryOpen(true);
+            }}
+          >
+            {t("history.compareDisk")}
+          </button>
           <button className="btn" onClick={() => void resolve("keep")}>
             {t("dialog.reloadKeep")}
           </button>

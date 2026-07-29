@@ -204,3 +204,60 @@ export function writeBytes(path: string, bytes: Uint8Array | number[]): Promise<
   const contentsB64 = btoa(binary);
   return invoke<void>("write_bytes", { path, contentsB64 });
 }
+
+// ---------- Local history (CAS snapshots) ----------
+
+export interface HistoryEntry {
+  id: string;
+  contentHash: string;
+  createdAt: number;
+  source: string;
+  byteLen: number;
+}
+
+export interface HistorySnapshotResult {
+  entry: HistoryEntry | null;
+  skipped: boolean;
+  reason: string | null;
+}
+
+export interface DiffHunk {
+  tag: "equal" | "insert" | "delete" | string;
+  text: string;
+}
+
+export function historyPut(
+  path: string,
+  text: string,
+  source: string,
+  opts?: { maxEntries?: number; maxBytes?: number; mergeMs?: number },
+): Promise<HistorySnapshotResult> {
+  return invoke<HistorySnapshotResult>("history_put", {
+    path,
+    text,
+    source,
+    maxEntries: opts?.maxEntries ?? null,
+    maxBytes: opts?.maxBytes ?? null,
+    mergeMs: opts?.mergeMs ?? null,
+  });
+}
+
+export function historyList(path: string): Promise<HistoryEntry[]> {
+  return invoke<HistoryEntry[]>("history_list", { path });
+}
+
+export function historyGet(contentHash: string): Promise<string> {
+  return invoke<string>("history_get", { contentHash });
+}
+
+export function historyDeleteEntry(path: string, entryId: string): Promise<void> {
+  return invoke<void>("history_delete_entry", { path, entryId });
+}
+
+export function historyClear(path: string): Promise<void> {
+  return invoke<void>("history_clear", { path });
+}
+
+export function historyDiff(left: string, right: string): Promise<DiffHunk[]> {
+  return invoke<DiffHunk[]>("history_diff", { left, right });
+}

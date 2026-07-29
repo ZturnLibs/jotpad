@@ -167,6 +167,7 @@ export function getMenuModel(): MenuModel {
     { sep: true },
     { id: "save", label: t("file.save"), ...sc("save") },
     { id: "saveAs", label: t("file.saveAs"), ...sc("saveAs") },
+    { id: "localHistory", label: t("history.menu"), disabled: !activeTab?.filePath },
     { sep: true },
     { id: "pageSetup", label: t("file.pageSetup") },
     { id: "print", label: t("file.print") },
@@ -336,6 +337,9 @@ export function runMenuAction(id: string): void {
       break;
     case "saveAs":
       if (s.activeTabId) void s.saveAsTab(s.activeTabId);
+      break;
+    case "localHistory":
+      s.setHistoryOpen(true);
       break;
     case "print":
       printDoc();
