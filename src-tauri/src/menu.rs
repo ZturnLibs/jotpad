@@ -205,6 +205,8 @@ pub fn default_menu<R: Runtime, M: Manager<R>>(
         items: vec![
             item("about", "关于 Jotpad", None),
             SEP,
+            item("settings", "设置…", Some("CmdOrCtrl+,")),
+            SEP,
             item("exit", "退出", Some("CmdOrCtrl+Q")),
         ],
     };

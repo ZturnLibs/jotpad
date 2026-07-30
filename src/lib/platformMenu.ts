@@ -68,9 +68,13 @@ export async function applyNativeMenu(): Promise<void> {
     const about = model.file.find((i) => i.id === "about");
     const checkUpdate = model.file.find((i) => i.id === "checkUpdate");
     const exit = model.file.find((i) => i.id === "exit");
+    const settings = model.view.find((i) => i.id === "settings");
     const appItems: MenuItemModel[] = [];
     if (about) appItems.push(about);
     if (checkUpdate) appItems.push(checkUpdate);
+    appItems.push({ sep: true });
+    // 系统习惯：偏好设置放在应用菜单，快捷键 Cmd+,
+    if (settings) appItems.push(settings);
     appItems.push({ sep: true });
     if (exit) appItems.push(exit);
     menus.push({ type: "submenu", text: "Jotpad", items: toDefs(appItems) });
@@ -81,13 +85,19 @@ export async function applyNativeMenu(): Promise<void> {
     );
     while (fileItems.length && fileItems[fileItems.length - 1].sep) fileItems.pop();
     menus.push({ type: "submenu", text: model.fileLabel, items: toDefs(fileItems) });
+
+    // 查看菜单不再重复「设置」（已在应用菜单）
+    let viewItems = model.view.filter((i) => i.id !== "settings");
+    while (viewItems.length && viewItems[viewItems.length - 1].sep) viewItems.pop();
+    menus.push({ type: "submenu", text: model.editLabel, items: toDefs(model.edit) });
+    menus.push({ type: "submenu", text: model.viewLabel, items: toDefs(viewItems) });
+    menus.push({ type: "submenu", text: model.windowLabel, items: toDefs(model.window) });
   } else {
     menus.push({ type: "submenu", text: model.fileLabel, items: toDefs(model.file) });
+    menus.push({ type: "submenu", text: model.editLabel, items: toDefs(model.edit) });
+    menus.push({ type: "submenu", text: model.viewLabel, items: toDefs(model.view) });
+    menus.push({ type: "submenu", text: model.windowLabel, items: toDefs(model.window) });
   }
-
-  menus.push({ type: "submenu", text: model.editLabel, items: toDefs(model.edit) });
-  menus.push({ type: "submenu", text: model.viewLabel, items: toDefs(model.view) });
-  menus.push({ type: "submenu", text: model.windowLabel, items: toDefs(model.window) });
 
   try {
     await invoke("set_app_menu", { menus });

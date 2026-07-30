@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { useStore } from "@/store/useStore";
 import { useT } from "@/lib/i18n";
@@ -10,9 +10,9 @@ import { Icon } from "./icons";
 type SettingsTab = "appearance" | "editor" | "general" | "voice";
 
 const TABS: { id: SettingsTab; labelKey: string }[] = [
-  { id: "appearance", labelKey: "settings.appearance" },
-  { id: "editor", labelKey: "settings.editor" },
   { id: "general", labelKey: "settings.general" },
+  { id: "editor", labelKey: "settings.editor" },
+  { id: "appearance", labelKey: "settings.appearance" },
   { id: "voice", labelKey: "settings.voice" },
 ];
 
@@ -73,6 +73,15 @@ function Toggle({
   );
 }
 
+function SettingsSection({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <section className="settings-section">
+      <h3 className="settings-section-title">{title}</h3>
+      <div className="settings-section-body">{children}</div>
+    </section>
+  );
+}
+
 /** 全屏设置页：左栏导航 + 返回，右栏配置详情。 */
 export function Settings() {
   const setOpen = useStore((s) => s.setSettingsOpen);
@@ -82,7 +91,7 @@ export function Settings() {
   const voicePack = useStore((s) => s.voicePack);
   const refreshVoicePack = useStore((s) => s.refreshVoicePack);
   const t = useT();
-  const [tab, setTab] = useState<SettingsTab>("appearance");
+  const [tab, setTab] = useState<SettingsTab>("general");
   const [shellNew, setShellNew] = useState(false);
   const [shellOpen, setShellOpen] = useState(false);
   const [shellBusy, setShellBusy] = useState(false);
@@ -104,7 +113,7 @@ export function Settings() {
       setTab("voice");
       setSettingsFocus(null);
     } else {
-      setTab("appearance");
+      setTab("general");
     }
   }, [setSettingsFocus]);
 
@@ -241,37 +250,43 @@ export function Settings() {
 
   return (
     <div className="settings-page" role="main" aria-label={t("settings.title")}>
-      <div className="settings-drag" data-tauri-drag-region />
-      <aside className="settings-sidebar">
-        <button type="button" className="settings-back" onClick={closeSettings}>
-          <Icon name="chevronLeft" size={16} />
-          <span>{t("settings.back")}</span>
-        </button>
-        <h1 className="settings-sidebar-title">{t("settings.title")}</h1>
-        <nav className="settings-nav" aria-label={t("settings.title")}>
-          {TABS.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              className={"settings-nav-item" + (tab === item.id ? " active" : "")}
-              aria-current={tab === item.id ? "page" : undefined}
-              onClick={() => setTab(item.id)}
-            >
-              {t(item.labelKey)}
+      <div className="settings-page-body">
+        <aside className="settings-sidebar">
+          {/* 左栏顶部拖动，背景与侧栏一致 */}
+          <div className="page-drag" data-tauri-drag-region aria-hidden />
+          <div className="settings-sidebar-main">
+            <button type="button" className="settings-back" onClick={closeSettings}>
+              <Icon name="chevronLeft" size={16} />
+              <span>{t("settings.back")}</span>
             </button>
-          ))}
-        </nav>
-      </aside>
+            <h1 className="settings-sidebar-title">{t("settings.title")}</h1>
+            <nav className="settings-nav" aria-label={t("settings.title")}>
+              {TABS.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  className={"settings-nav-item" + (tab === item.id ? " active" : "")}
+                  aria-current={tab === item.id ? "page" : undefined}
+                  onClick={() => setTab(item.id)}
+                >
+                  {t(item.labelKey)}
+                </button>
+              ))}
+            </nav>
+          </div>
+        </aside>
 
-      <section className="settings-content">
-        <header className="settings-content-header">
-          <h2>{activeTabLabel}</h2>
-        </header>
-        <div className="settings-panel">
+        <section className="settings-content">
+          {/* 右栏顶部拖动，背景与详情区一致 */}
+          <div className="page-drag" data-tauri-drag-region aria-hidden />
+          <div className="settings-content-main">
+            <header className="settings-content-header">
+              <h2>{activeTabLabel}</h2>
+            </header>
+            <div className="settings-panel">
           {tab === "appearance" && (
             <>
-              <div className="field">
-                <label>{t("view.theme")}</label>
+              <SettingsSection title={t("view.theme")}>
                 <Segmented<ThemeMode>
                   value={settings.theme}
                   onChange={(v) => setSettings({ theme: v })}
@@ -281,9 +296,8 @@ export function Settings() {
                     { value: "system", label: t("view.themeSystem") },
                   ]}
                 />
-              </div>
-              <div className="field">
-                <label>{t("settings.accent")}</label>
+              </SettingsSection>
+              <SettingsSection title={t("settings.accent")}>
                 <div className="swatches">
                   {ACCENT_PRESETS.map((c) => (
                     <button
@@ -300,62 +314,64 @@ export function Settings() {
                     />
                   ))}
                 </div>
-              </div>
+              </SettingsSection>
             </>
           )}
 
           {tab === "editor" && (
             <>
-              <div className="field">
-                <label>{t("settings.font")}</label>
-                <select
-                  value={settings.fontFamily}
-                  onChange={(e) => setSettings({ fontFamily: e.target.value })}
-                >
-                  {FONT_PRESETS.map((f) => (
-                    <option key={f} value={f} style={{ fontFamily: f }}>
-                      {firstName(f)}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="field">
-                <label>{t("settings.fontSize")}</label>
-                <input
-                  type="number"
-                  min={8}
-                  max={72}
-                  value={settings.fontSize}
-                  onChange={(e) =>
-                    setSettings({ fontSize: clamp(parseInt(e.target.value) || 8, 8, 72) })
-                  }
-                />
-              </div>
-              <div className="settings-toggles">
-                <Toggle
-                  on={settings.wordWrap}
-                  onChange={(v) => setSettings({ wordWrap: v })}
-                  label={t("settings.wordWrap")}
-                />
-                <Toggle
-                  on={settings.showLineNumbers}
-                  onChange={(v) => setSettings({ showLineNumbers: v })}
-                  label={t("settings.lineNumbers")}
-                />
-                <Toggle
-                  on={settings.spellCheck}
-                  onChange={(v) => setSettings({ spellCheck: v })}
-                  label={t("settings.spellCheck")}
-                />
-              </div>
-              <p className="settings-hint muted">{t("settings.spellCheckHint")}</p>
+              <SettingsSection title={t("settings.font")}>
+                <div className="field">
+                  <select
+                    value={settings.fontFamily}
+                    onChange={(e) => setSettings({ fontFamily: e.target.value })}
+                  >
+                    {FONT_PRESETS.map((f) => (
+                      <option key={f} value={f} style={{ fontFamily: f }}>
+                        {firstName(f)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="field">
+                  <label>{t("settings.fontSize")}</label>
+                  <input
+                    type="number"
+                    min={8}
+                    max={72}
+                    value={settings.fontSize}
+                    onChange={(e) =>
+                      setSettings({ fontSize: clamp(parseInt(e.target.value) || 8, 8, 72) })
+                    }
+                  />
+                </div>
+              </SettingsSection>
+              <SettingsSection title={t("settings.behavior")}>
+                <div className="settings-toggles">
+                  <Toggle
+                    on={settings.wordWrap}
+                    onChange={(v) => setSettings({ wordWrap: v })}
+                    label={t("settings.wordWrap")}
+                  />
+                  <Toggle
+                    on={settings.showLineNumbers}
+                    onChange={(v) => setSettings({ showLineNumbers: v })}
+                    label={t("settings.lineNumbers")}
+                  />
+                  <Toggle
+                    on={settings.spellCheck}
+                    onChange={(v) => setSettings({ spellCheck: v })}
+                    label={t("settings.spellCheck")}
+                  />
+                </div>
+                <p className="settings-hint muted">{t("settings.spellCheckHint")}</p>
+              </SettingsSection>
             </>
           )}
 
           {tab === "general" && (
             <>
-              <div className="field">
-                <label>{t("settings.language")}</label>
+              <SettingsSection title={t("settings.language")}>
                 <Segmented<Locale>
                   value={settings.locale}
                   onChange={(v) => setSettings({ locale: v })}
@@ -364,32 +380,33 @@ export function Settings() {
                     { value: "en", label: "English" },
                   ]}
                 />
-              </div>
-              <div className="settings-toggles">
-                <Toggle
-                  on={settings.showStatusBar}
-                  onChange={(v) => setSettings({ showStatusBar: v })}
-                  label={t("settings.showStatusBar")}
-                />
-                <Toggle
-                  on={settings.autoCheckUpdates}
-                  onChange={(v) => {
-                    setSettings({ autoCheckUpdates: v });
-                    void useStore.getState().persist();
-                  }}
-                  label={t("settings.autoCheckUpdates")}
-                />
-                <Toggle
-                  on={settings.localHistoryEnabled}
-                  onChange={(v) => {
-                    setSettings({ localHistoryEnabled: v });
-                    void useStore.getState().persist();
-                  }}
-                  label={t("settings.localHistory")}
-                />
-              </div>
-              <div className="field" style={{ marginTop: 12 }}>
-                <label>{t("settings.startup")}</label>
+              </SettingsSection>
+              <SettingsSection title={t("settings.behavior")}>
+                <div className="settings-toggles">
+                  <Toggle
+                    on={settings.showStatusBar}
+                    onChange={(v) => setSettings({ showStatusBar: v })}
+                    label={t("settings.showStatusBar")}
+                  />
+                  <Toggle
+                    on={settings.autoCheckUpdates}
+                    onChange={(v) => {
+                      setSettings({ autoCheckUpdates: v });
+                      void useStore.getState().persist();
+                    }}
+                    label={t("settings.autoCheckUpdates")}
+                  />
+                  <Toggle
+                    on={settings.localHistoryEnabled}
+                    onChange={(v) => {
+                      setSettings({ localHistoryEnabled: v });
+                      void useStore.getState().persist();
+                    }}
+                    label={t("settings.localHistory")}
+                  />
+                </div>
+              </SettingsSection>
+              <SettingsSection title={t("settings.startup")}>
                 <Segmented<StartupMode>
                   value={settings.startupMode}
                   onChange={(v) => setSettings({ startupMode: v })}
@@ -399,30 +416,10 @@ export function Settings() {
                   ]}
                 />
                 <p className="settings-hint muted">{t("settings.startupHint")}</p>
-              </div>
-              <div className="field" style={{ marginTop: 12 }}>
-                <label>{t("settings.defaultSaveDirectory")}</label>
-                <div
-                  className="menu-row"
-                  style={{
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    gap: 12,
-                    borderRadius: 6,
-                    padding: "10px 12px",
-                    background: "var(--bg)",
-                    border: "1px solid var(--border)",
-                  }}
-                >
-                  <span
-                    className="muted"
-                    style={{
-                      flex: 1,
-                      minWidth: 0,
-                      wordBreak: "break-all",
-                      fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
-                    }}
-                  >
+              </SettingsSection>
+              <SettingsSection title={t("settings.defaultSaveDirectory")}>
+                <div className="settings-path-row">
+                  <span className="settings-path-value muted">
                     {settings.defaultSaveDirectory ||
                       systemDocumentsDir ||
                       t("settings.systemDocuments")}
@@ -445,9 +442,8 @@ export function Settings() {
                   <p className="settings-hint muted">{t("settings.systemDocuments")}</p>
                 ) : null}
                 <p className="settings-hint muted">{t("settings.defaultSaveDirectoryHint")}</p>
-              </div>
-              <div className="field" style={{ marginTop: 12 }}>
-                <label>{t("settings.system")}</label>
+              </SettingsSection>
+              <SettingsSection title={t("settings.system")}>
                 <p className="settings-hint muted">{t("settings.shellHint")}</p>
                 {shellPlatformHint() && (
                   <p className="settings-hint muted">{shellPlatformHint()}</p>
@@ -467,63 +463,62 @@ export function Settings() {
                   />
                 </div>
                 {shellError && <p className="settings-hint settings-error">{shellError}</p>}
-              </div>
+              </SettingsSection>
             </>
           )}
 
           {tab === "voice" && (
-            <>
-              <div className="field">
-                <label>{t("settings.voiceStatus")}</label>
-                <p className="settings-hint muted">{t("voice.privacyHint")}</p>
-                <p className="settings-hint">
-                  {voicePack?.state === "ready"
-                    ? `${t("voice.packReady")}${voicePack.engine ? ` (${voicePack.engine})` : ""}`
-                    : voiceBusy || voicePack?.state === "downloading"
-                      ? t("voice.packDownloading")
-                      : t("voice.packMissing")}
-                  {voiceProgress &&
-                    voiceProgress.total > 0 &&
-                    ` · ${voiceProgress.phase} ${Math.min(
-                      100,
-                      Math.round((voiceProgress.received / voiceProgress.total) * 100),
-                    )}%`}
-                </p>
-                {voiceError && <p className="settings-hint settings-error">{voiceError}</p>}
-                <div className="dialog-actions" style={{ justifyContent: "flex-start", marginTop: 8 }}>
-                  {voiceBusy ? (
-                    <button
-                      type="button"
-                      className="btn"
-                      onClick={() => void api.voicePackCancelDownload()}
-                    >
-                      {t("voice.cancelDownload")}
-                    </button>
-                  ) : voicePack?.state === "ready" ? (
-                    <button
-                      type="button"
-                      className="btn"
-                      disabled={voiceBusy}
-                      onClick={() => void deleteVoicePack()}
-                    >
-                      {t("voice.deletePack")}
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      className="btn primary"
-                      disabled={voiceBusy}
-                      onClick={() => void downloadVoicePack()}
-                    >
-                      {t("voice.download")}
-                    </button>
-                  )}
-                </div>
+            <SettingsSection title={t("settings.voiceStatus")}>
+              <p className="settings-hint muted">{t("voice.privacyHint")}</p>
+              <p className="settings-hint">
+                {voicePack?.state === "ready"
+                  ? `${t("voice.packReady")}${voicePack.engine ? ` (${voicePack.engine})` : ""}`
+                  : voiceBusy || voicePack?.state === "downloading"
+                    ? t("voice.packDownloading")
+                    : t("voice.packMissing")}
+                {voiceProgress &&
+                  voiceProgress.total > 0 &&
+                  ` · ${voiceProgress.phase} ${Math.min(
+                    100,
+                    Math.round((voiceProgress.received / voiceProgress.total) * 100),
+                  )}%`}
+              </p>
+              {voiceError && <p className="settings-hint settings-error">{voiceError}</p>}
+              <div className="dialog-actions" style={{ justifyContent: "flex-start", marginTop: 8 }}>
+                {voiceBusy ? (
+                  <button
+                    type="button"
+                    className="btn"
+                    onClick={() => void api.voicePackCancelDownload()}
+                  >
+                    {t("voice.cancelDownload")}
+                  </button>
+                ) : voicePack?.state === "ready" ? (
+                  <button
+                    type="button"
+                    className="btn"
+                    disabled={voiceBusy}
+                    onClick={() => void deleteVoicePack()}
+                  >
+                    {t("voice.deletePack")}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="btn primary"
+                    disabled={voiceBusy}
+                    onClick={() => void downloadVoicePack()}
+                  >
+                    {t("voice.download")}
+                  </button>
+                )}
               </div>
-            </>
+            </SettingsSection>
           )}
         </div>
+          </div>
       </section>
+      </div>
     </div>
   );
 }

@@ -38,3 +38,4 @@ alwaysApply: false
 
 - 样式放 `src/styles/`；类名与现有 `app.css` 约定一致。
 - 不引入新 UI 库；保持记事本式轻量界面。
+- 全屏页顶部拖动：用 `<PageDragRegion />`，见 `.cursor/rules/window-drag.mdc`。

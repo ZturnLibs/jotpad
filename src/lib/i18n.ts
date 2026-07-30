@@ -14,6 +14,7 @@ const zhCN: Dict = {
   "menu.view": "查看",
   "menu.window": "窗口",
   "menu.help": "帮助",
+  "menu.settings": "设置…",
 
   // File menu
   "file.new": "新建标签页",
@@ -283,6 +284,7 @@ const en: Dict = {
   "menu.view": "View",
   "menu.window": "Window",
   "menu.help": "Help",
+  "menu.settings": "Settings…",
 
   "file.new": "New Tab",
   "file.newKey": "Ctrl+N",

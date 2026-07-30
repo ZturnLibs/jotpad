@@ -267,7 +267,11 @@ export const SHORTCUTS: readonly ShortcutDef[] = [
   },
   {
     id: "settings",
-    chords: [{ key: ",", mod: true }],
+    // 部分布局下逗号可能以 "Comma" 报到
+    chords: [
+      { key: ",", mod: true },
+      { key: "Comma", mod: true },
+    ],
     label: `${MOD}+,`,
     accel: A(","),
   },

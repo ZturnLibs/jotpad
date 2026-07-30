@@ -1,0 +1,43 @@
+---
+description: 全屏页顶部窗口拖动区约定（macOS Overlay / 跨平台）
+globs: src/components/**/*.{tsx,jsx,css}
+alwaysApply: false
+---
+
+# 窗口顶部拖动
+
+Jotpad 使用 macOS `titleBarStyle: Overlay`，全屏页与侧栏顶部必须提供可拖动区域，否则用户无法拖动窗口。
+
+## 必须
+
+- 新建全屏页（类似设置页）时，页面最顶部使用 `<PageDragRegion />`（`src/components/PageDragRegion.tsx`）。
+- 样式只用 `.page-drag`；**不要**对拖动区设置 `pointer-events: none`（会导致无法拖动）。
+- 拖动条下方的可点击控件（按钮、输入、链接）所在容器加 `-webkit-app-region: no-drag` / `app-region: no-drag`。
+- 拖动条作为独立 flex 子项放在内容之上，不要用会挡住交互的绝对定位蒙层（除非蒙层本身可接收事件且不覆盖按钮）。
+- 双栏全屏页：左右栏各自放一条 `.page-drag`，让拖动区背景与该栏内容区一致，不要单独铺一条跨栏纯色顶栏。
+
+```tsx
+// ✅ GOOD：单栏页
+<div className="foo-page">
+  <PageDragRegion />
+  <div className="foo-page-body">{/* 交互区 no-drag */}</div>
+</div>
+
+// ✅ GOOD：左右分栏页
+<aside>
+  <div className="page-drag" data-tauri-drag-region />
+  <div className="aside-main">{/* no-drag */}</div>
+</aside>
+<section>
+  <div className="page-drag" data-tauri-drag-region />
+  <div className="section-main">{/* no-drag */}</div>
+</section>
+
+// ❌ BAD：pointer-events:none 的绝对定位条
+<div className="drag" style={{ pointerEvents: "none" }} data-tauri-drag-region />
+```
+
+## 高度
+
+- `.page-drag` 默认高度兼顾非 macOS；`[data-platform="macos"]` 下加高到约 40px，避开红绿灯。
+- 不要在内容区再额外堆一大块“假标题栏 padding”去替代拖动条。

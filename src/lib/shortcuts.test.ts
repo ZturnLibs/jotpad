@@ -76,4 +76,16 @@ describe("shortcuts catalog", () => {
   it("matches Escape", () => {
     expect(matchShortcut(key("Escape"), "macos")).toEqual({ kind: "escape" });
   });
+
+  it("matches Mod+, as settings", () => {
+    expect(matchShortcut(key(",", { meta: true }), "macos")).toEqual({
+      kind: "action",
+      id: "settings",
+    });
+    expect(matchShortcut(key(",", { ctrl: true }), "windows")).toEqual({
+      kind: "action",
+      id: "settings",
+    });
+    expect(shortcutAccel("settings")).toBe("CmdOrCtrl+,");
+  });
 });

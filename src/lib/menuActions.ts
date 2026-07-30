@@ -274,7 +274,7 @@ export function getMenuModel(): MenuModel {
       })),
     },
     { sep: true },
-    { id: "settings", label: t("toolbar.settings"), ...sc("settings") },
+    { id: "settings", label: t("menu.settings"), ...sc("settings") },
   ];
 
   // Window — document/window chrome (TextEdit / browsers / VS Code pattern).

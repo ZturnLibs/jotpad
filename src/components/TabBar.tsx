@@ -4,6 +4,7 @@ import { useT } from "@/lib/i18n";
 import { basename, clipboardWriteText, nativeMessage, revealInFolder } from "@/lib/backend";
 import { platform } from "@/lib/utils";
 import { Icon } from "./icons";
+import { PageDragRegion } from "./PageDragRegion";
 
 interface CtxMenu {
   tabId: string;
@@ -210,7 +211,7 @@ export function TabBar() {
 
   return (
     <div className="tabs">
-      <div className="tabs-drag" data-tauri-drag-region />
+      <PageDragRegion />
       {showFilter ? (
         <div className="tabs-filter">
           <input
