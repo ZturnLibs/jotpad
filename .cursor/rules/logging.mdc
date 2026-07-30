@@ -22,6 +22,7 @@ crate::app_log::error("voice", format!("engine failed: {detail}"));
 - 模块名短小写（`voice`、`menu`、`history`）
 - 用户可见文案走 i18n；**技术细节只写日志**，不要把 stderr / 堆栈直接展示给用户
 - 边界错误用稳定错误码（如 `voice:nospeech`、`voice:engine`），前端映射文案
+- 非显而易见的解析/降噪策略旁加中文注释（见 `core-practices.mdc` 注释约束）
 
 ## 前端
 

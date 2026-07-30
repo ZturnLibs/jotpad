@@ -29,10 +29,10 @@ alwaysApply: false
 - 变体用 children / 插槽 / 小组件，而不是越来越多的布尔 props。
 - 对话框、菜单、浮层与主编辑区解耦，通过 store 或回调通信。
 
-## 注释
+## 注释（遵循 `core-practices.mdc`）
 
 - 复杂交互（标签切换、外部文件变更、CodeMirror 同步）在 effect 入口写中文「为何如此」。
-- Props 仅在含义非自明时用中文 JSDoc 简短说明。
+- Props 仅在含义非自明时用中文 JSDoc 简短说明；不给平凡 props 堆注释。
 
 ## 样式与结构
 
