@@ -1,0 +1,44 @@
+---
+description: 统一应用日志约定（Rust + 前端）
+globs: "{src-tauri/src/**/*.rs,src/lib/log.ts,src/components/**/*.tsx}"
+alwaysApply: false
+---
+
+# 日志记录
+
+## 落盘位置
+
+- 文件：`{app_data}/logs/jotpad.log`（超 2MB 轮转为 `jotpad.log.1`）
+- 同时输出到 stderr，便于开发时查看
+
+## Rust
+
+```rust
+crate::app_log::info("voice", "transcribe ok");
+crate::app_log::warn("voice", "pack not ready");
+crate::app_log::error("voice", format!("engine failed: {detail}"));
+```
+
+- 模块名短小写（`voice`、`menu`、`history`）
+- 用户可见文案走 i18n；**技术细节只写日志**，不要把 stderr / 堆栈直接展示给用户
+- 边界错误用稳定错误码（如 `voice:nospeech`、`voice:engine`），前端映射文案
+
+## 前端
+
+```ts
+import { logWarn, logError, voiceErrorI18nKey } from "@/lib/log";
+
+setError(t(voiceErrorI18nKey(raw)));
+logError("voice", "transcribe failed", raw);
+```
+
+- `logWarn` / `logError` 会经 `app_log_write` 写入同一日志文件
+- 捕获异常后：友好提示 + 打日志；不要 `console.error` 了事
+
+## 语音错误码
+
+| 码 | 含义 | i18n |
+|---|---|---|
+| `voice:nospeech` | 静音 / `<\|nospeech\|>` / 空转写 | `voice.noSpeech` |
+| `voice:engine` | 引擎进程失败 | `voice.error` |
+| `voice:pack_missing` | 模型未下载 | `voice.packNotReady` |

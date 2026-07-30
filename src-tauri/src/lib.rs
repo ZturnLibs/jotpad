@@ -1,4 +1,5 @@
 // Jotpad backend: multi-encoding file I/O + persistent state (drafts/settings/recents).
+mod app_log;
 mod history;
 mod menu;
 mod shell_integration;
@@ -329,6 +330,7 @@ pub fn run() {
             get_system_accent,
             current_exe_path,
             documents_dir,
+            app_log::app_log_write,
             shell_integration::take_pending_open_paths,
             shell_integration::shell_integration_status,
             shell_integration::set_shell_new_text_file,
@@ -348,6 +350,10 @@ pub fn run() {
         ])
         .on_menu_event(|app, event| menu::handle_event(app, event))
         .setup(|app| {
+            if let Err(e) = app_log::init(app.handle()) {
+                eprintln!("[log] init failed: {e}");
+            }
+
             // App-wide menu (required on macOS; Window::set_menu is a no-op there).
             let menu = menu::default_menu(app)?;
             app.set_menu(menu)?;

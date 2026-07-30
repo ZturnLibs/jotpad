@@ -6,6 +6,7 @@ import * as api from "@/lib/backend";
 import { getEditorView } from "@/lib/editorRef";
 import { insertAtCursor } from "@/lib/edit";
 import { WavRecorder, defaultWavName } from "@/lib/voice/recorder";
+import { logError, voiceErrorI18nKey } from "@/lib/log";
 
 type Phase = "idle" | "recording" | "transcribing" | "done" | "error";
 
@@ -62,7 +63,7 @@ export function VoiceBar() {
     } catch (e) {
       setPhase("error");
       setError(t("voice.micError"));
-      console.error(e);
+      logError("voice", "microphone start failed", e);
     }
   };
 
@@ -95,8 +96,10 @@ export function VoiceBar() {
       }
       setPhase("done");
     } catch (e) {
+      const raw = e instanceof Error ? e.message : String(e);
       setPhase("error");
-      setError(e instanceof Error ? e.message : String(e));
+      setError(t(voiceErrorI18nKey(raw)));
+      logError("voice", "transcribe failed", raw);
     }
   };
 
@@ -107,7 +110,9 @@ export function VoiceBar() {
     try {
       await api.writeBytes(path, wav);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      const raw = e instanceof Error ? e.message : String(e);
+      setError(t("voice.error"));
+      logError("voice", "save audio failed", raw);
     }
   };
 
@@ -124,8 +129,10 @@ export function VoiceBar() {
       }
       setPhase("done");
     } catch (e) {
+      const raw = e instanceof Error ? e.message : String(e);
       setPhase("error");
-      setError(e instanceof Error ? e.message : String(e));
+      setError(t(voiceErrorI18nKey(raw)));
+      logError("voice", "transcribe retry failed", raw);
     }
   };
 
@@ -149,7 +156,7 @@ export function VoiceBar() {
             {phase === "done" && <span className="muted">{t("voice.done")}</span>}
             {phase === "error" && (
               <span className="voice-error" title={error ?? ""}>
-                {t("voice.error")}
+                {error ?? t("voice.error")}
               </span>
             )}
             {wav && (

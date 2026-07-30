@@ -273,36 +273,7 @@ fn install_from_staging(app: &AppHandle, staging: &Path) -> Result<(), String> {
     Ok(())
 }
 
-fn parse_transcript(stdout: &str) -> String {
-    // sherpa-onnx-offline 常见输出：`text: ...` 或 JSON 行含 "text"
-    let mut raw = String::new();
-    for line in stdout.lines().rev() {
-        let trimmed = line.trim();
-        if let Some(rest) = trimmed.strip_prefix("text:") {
-            raw = rest.trim().to_string();
-            break;
-        }
-        if trimmed.contains("\"text\"") {
-            if let Ok(v) = serde_json::from_str::<serde_json::Value>(trimmed) {
-                if let Some(t) = v.get("text").and_then(|x| x.as_str()) {
-                    raw = t.trim().to_string();
-                    break;
-                }
-            }
-        }
-    }
-    if raw.is_empty() {
-        raw = stdout
-            .lines()
-            .map(str::trim)
-            .filter(|l| {
-                !l.is_empty() && !l.starts_with('{') && !l.contains("ms") && !l.contains('/')
-            })
-            .last()
-            .unwrap_or("")
-            .to_string();
-    }
-    // 去掉 SenseVoice 控制标记如 <|zh|>、<|NEUTRAL|>
+fn strip_sense_voice_tags(raw: &str) -> String {
     let mut out = String::new();
     let mut chars = raw.chars().peekable();
     while let Some(c) = chars.next() {
@@ -317,6 +288,83 @@ fn parse_transcript(stdout: &str) -> String {
         out.push(c);
     }
     out.trim().to_string()
+}
+
+fn is_effectively_empty_transcript(text: &str) -> bool {
+    let t = text.trim();
+    if t.is_empty() {
+        return true;
+    }
+    // 仅标点/省略号，视为无有效正文
+    t.chars().all(|c| {
+        c.is_whitespace()
+            || matches!(c, '.' | '。' | '…' | ',' | '，' | '?' | '？' | '!' | '！' | ';' | '；' | ':' | '：')
+    })
+}
+
+struct ParsedTranscript {
+    text: String,
+    no_speech: bool,
+}
+
+fn parse_transcript(combined: &str) -> ParsedTranscript {
+    // sherpa 常把 JSON 打到 stderr；调用方应传入 stdout+stderr 合并文本
+    let mut raw = String::new();
+    let mut no_speech = false;
+
+    for line in combined.lines().rev() {
+        let trimmed = line.trim();
+        // JSON 可能夹在同一行其它日志后面，尝试截取第一个 `{...}`
+        if let Some(start) = trimmed.find('{') {
+            if let Some(end) = trimmed.rfind('}') {
+                if end > start {
+                    let slice = &trimmed[start..=end];
+                    if let Ok(v) = serde_json::from_str::<serde_json::Value>(slice) {
+                        if let Some(lang) = v.get("lang").and_then(|x| x.as_str()) {
+                            if lang.contains("nospeech") {
+                                no_speech = true;
+                            }
+                        }
+                        if let Some(t) = v.get("text").and_then(|x| x.as_str()) {
+                            raw = t.trim().to_string();
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        if let Some(rest) = trimmed.strip_prefix("text:") {
+            raw = rest.trim().to_string();
+            break;
+        }
+    }
+
+    if raw.is_empty() {
+        raw = combined
+            .lines()
+            .map(str::trim)
+            .filter(|l| {
+                !l.is_empty()
+                    && !l.starts_with('{')
+                    && !l.contains("ms")
+                    && !l.contains('/')
+                    && !l.contains("OfflineRecognizerConfig")
+                    && !l.contains("Creating recognizer")
+                    && !l.contains("Started")
+                    && !l.contains("Done!")
+                    && !l.contains("Elapsed")
+                    && !l.contains("num threads")
+            })
+            .last()
+            .unwrap_or("")
+            .to_string();
+    }
+
+    let text = strip_sense_voice_tags(&raw);
+    if combined.contains("<|nospeech|>") {
+        no_speech = true;
+    }
+    ParsedTranscript { text, no_speech }
 }
 
 #[tauri::command]
@@ -468,7 +516,10 @@ pub async fn voice_transcribe(app: AppHandle, wav_b64: String) -> Result<String,
     let wav_bytes = base64::engine::general_purpose::STANDARD
         .decode(wav_b64.trim())
         .map_err(|e| e.to_string())?;
-    let (manifest, root) = pack_is_ready(&app).ok_or_else(|| "voice pack not ready".to_string())?;
+    let (manifest, root) = pack_is_ready(&app).ok_or_else(|| {
+        crate::app_log::warn("voice", "transcribe skipped: voice pack not ready");
+        "voice:pack_missing".to_string()
+    })?;
     let bin = root.join(&manifest.bin);
     let model = root.join(&manifest.model);
     let tokens = root.join(&manifest.tokens);
@@ -502,12 +553,34 @@ pub async fn voice_transcribe(app: AppHandle, wav_b64: String) -> Result<String,
     let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
     let stderr = String::from_utf8_lossy(&output.stderr).into_owned();
     if !output.status.success() {
-        return Err(format!("transcribe failed: {stderr} {stdout}"));
+        crate::app_log::error(
+            "voice",
+            format!("transcribe process failed; stdout={stdout} stderr={stderr}"),
+        );
+        return Err("voice:engine".into());
     }
 
-    let text = parse_transcript(&stdout);
-    if text.is_empty() {
-        return Err(format!("empty transcription; stdout={stdout} stderr={stderr}"));
+    // sherpa-onnx-offline 常把结果 JSON 写到 stderr
+    let combined = if stdout.is_empty() {
+        stderr.clone()
+    } else if stderr.is_empty() {
+        stdout.clone()
+    } else {
+        format!("{stdout}\n{stderr}")
+    };
+    let parsed = parse_transcript(&combined);
+
+    if parsed.no_speech || is_effectively_empty_transcript(&parsed.text) {
+        crate::app_log::info(
+            "voice",
+            format!("no speech / empty transcript; text={:?}", parsed.text),
+        );
+        return Err("voice:nospeech".into());
     }
-    Ok(text)
+
+    crate::app_log::info(
+        "voice",
+        format!("transcribe ok; chars={}", parsed.text.chars().count()),
+    );
+    Ok(parsed.text)
 }
