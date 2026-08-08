@@ -384,17 +384,21 @@ textarea {
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
 }
-[data-platform="macos"] .toolbar {
-  -webkit-app-region: drag;
-  app-region: drag;
-}
-[data-platform="macos"] .toolbar button,
-[data-platform="macos"] .toolbar select,
-[data-platform="macos"] .toolbar input,
-[data-platform="macos"] .toolbar .tb-group,
-[data-platform="macos"] .toolbar .tb-size-wrap {
+/* 控件簇不可拖；中间 tb-drag-fill 才是窗口拖动区 */
+.tb-cluster {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
   -webkit-app-region: no-drag;
   app-region: no-drag;
+}
+.tb-drag-fill {
+  flex: 1;
+  align-self: stretch;
+  min-width: 12px;
+  -webkit-app-region: drag;
+  app-region: drag;
 }
 .tb-group {
   display: flex;
@@ -438,9 +442,6 @@ textarea {
 }
 .tb-select.font {
   width: 150px;
-}
-.tb-spacer {
-  flex: 1;
 }
 .tb-size-wrap {
   display: flex;

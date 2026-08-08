@@ -37,6 +37,22 @@ Jotpad 使用 macOS `titleBarStyle: Overlay`，全屏页与侧栏顶部必须提
 <div className="drag" style={{ pointerEvents: "none" }} data-tauri-drag-region />
 ```
 
+## 主界面工具栏
+
+编辑区上方工具栏用「左右控件簇 + 中间空白拖动」：
+
+- 控件放在 `.tb-cluster`（`no-drag`），保证按钮 / select / 输入可点。
+- 中间唯一拖动空白：`.tb-drag-fill` + `data-tauri-drag-region`（`flex:1`，整行高度可拖）。
+- **不要**对整栏 `.toolbar` 设 `app-region: drag`（与设置页独立拖动条同一思路）。
+
+```tsx
+<div className="toolbar">
+  <div className="tb-cluster">{/* 字体、字号、换行、缩放 */}</div>
+  <div className="tb-drag-fill" data-tauri-drag-region aria-hidden />
+  <div className="tb-cluster">{/* 主题、设置 */}</div>
+</div>
+```
+
 ## 高度
 
 - `.page-drag` 默认高度兼顾非 macOS；`[data-platform="macos"]` 下加高到约 40px，避开红绿灯。
