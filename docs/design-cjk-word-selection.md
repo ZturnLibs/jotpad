@@ -1,6 +1,6 @@
 # CJK 词边界选词优化 · 技术设计
 
-> 状态：设计完成，待实现
+> 状态：✅ **已实现**（commit `2096592`，2025-08-08）
 > 日期：2025-08-08
 > 关联：`docs/research-text-explosion.md`（需求验证结论）
 > 目标：修复 Jotpad（CodeMirror）双击中文时"选中整段而非一个词"的体验缺陷。
@@ -130,7 +130,7 @@ CJK 区段正则：`[\u3400-\u9fff\uf900-\ufaff\u3040-\u30ff\uac00-\ud7af]`（CJ
 
 ---
 
-## 五、实现（参考代码）
+## 五、实现
 
 新增 `src/lib/cjkSelection.ts`，在 `Editor.tsx` 的 extensions 中注册。
 
@@ -206,6 +206,8 @@ import { cjkWordSelection } from "@/lib/cjkSelection";
 extensions: [ /* 既有扩展... */ , cjkWordSelection ],
 ```
 
+> **实现备注**：上述代码即为落地的 `src/lib/cjkSelection.ts`（功能一致）。另需在 `tsconfig.json` 的 `lib` 增加 `"ES2022.Intl"` 以获得 `Intl.Segmenter` 的类型声明（仅类型，无运行时影响）。
+
 ---
 
 ## 六、边界与降级
@@ -220,19 +222,16 @@ extensions: [ /* 既有扩展... */ , cjkWordSelection ],
 
 ---
 
-## 七、测试计划
+## 七、测试结果（已通过）
 
-1. **手动**：
-   - 双击「文字大爆炸」中的「爆」→ 应只选「爆炸」
-   - 双击英文单词、版本号 `v1.2.3`、邮箱 → 行为与改动前一致
-   - 双击中文标点「，」→ 选中标点（默认行为）
-   - 双击后横向拖拽 → 按词扩选
-2. **单元**（`cjkSelection.test.ts`）：对 `wordRangeAt` 用 `EditorState.create({doc})` 构造状态，断言各 pos 命中区间；含英文/标点返回 null。
-3. **回归**：现有 25 个测试全过；确认未触及 Tab/工具栏/状态栏逻辑。
+- **单元**（`src/lib/cjkSelection.test.ts`，4 用例）：词中间命中区间 / 中文标点返回 null / 不跨逻辑行分词 / 中英混排各自分词。
+- **回归**：全量 `vitest` **29/29 通过**（新增 4 个），`tsc` 0 错误，`vite build` 成功。
+- **手动验证（待 dev 实测）**：双击「爆」选「爆炸」、双击英文/`v1.2.3`/邮箱不变、双击中文标点选中标点本身、双击后拖拽按词扩选。
 
 ---
 
-## 八、成本与收益
+## 八、成本与收益（实际）
 
-- **成本**：约 1 个新文件（~50 行）+ Editor.tsx 加一行注册；分词零依赖。预计半天。
+- **成本**：1 个新文件 `cjkSelection.ts`（~80 行）+ `cjkSelection.test.ts`（4 用例）+ `Editor.tsx` 加一行注册 + `tsconfig` 加 `ES2022.Intl`。主包体积 **+1KB**（gzip），**零运行时依赖**（分词用浏览器内置 `Intl.Segmenter`）。
 - **收益**：修掉 CodeMirror 已知 CJK 缺陷，所有中文用户双击选词即受益；无新 UI、不臃肿，契合极简定位与 Bear 用户「别臃肿」诉求。
+- **未做（保留观察）**：`Ctrl/Cmd+←/→` 按词移动（走 commands 包 `moveByGroup` 另一条路径）；「多选不连续词复制」（无需求证据）。

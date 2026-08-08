@@ -1,6 +1,6 @@
 # 文字大爆炸 · 真实用户需求研究
 
-> 状态：**已完成需求验证，方向已修订**（见第六节）
+> 状态：**需求已验证 + 方案已实现**（见第六、七节，设计详见 `docs/design-cjk-word-selection.md`）
 > 日期：2025-08-08
 > 目的：为 Jotpad「文字大爆炸」功能收集真实用户需求，先验证需求真伪与优先级，再进入设计。
 >
@@ -166,6 +166,11 @@
 
 ### 下一步
 
-1. 调研 CodeMirror 6 双击选词的扩展点（`EditorView.mouseSelectionStyle` / `selectWord`）
-2. 选定分词方案（jieba-wasm 体积 vs 自带简易 CJK 词表）
-3. 输出 CJK 选词优化的技术设计与实现
+1. ~~调研 CodeMirror 6 双击选词的扩展点~~ → 已选定 `mouseSelectionStyle` facet
+2. ~~选定分词方案~~ → 已选定浏览器内置 `Intl.Segmenter`（零依赖，放弃 jieba-wasm）
+3. ~~输出 CJK 选词优化的技术设计与实现~~ → 已完成：
+   - 设计文档：`docs/design-cjk-word-selection.md`
+   - 实现：`src/lib/cjkSelection.ts` + `Editor.tsx` 注册（commit `2096592`）
+   - 测试：4 用例，全量 29/29 通过
+
+> **结论**：从「文字大爆炸」大功能窄化为「CJK 双击选词」微修复，已落地。后续仅当出现「多选不连续词复制」的自发需求时再评估是否扩展。
