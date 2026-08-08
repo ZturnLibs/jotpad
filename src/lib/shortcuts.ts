@@ -133,6 +133,12 @@ export const SHORTCUTS: readonly ShortcutDef[] = [
     accel: A("P"),
   },
   {
+    id: "crossSearch",
+    chords: [{ key: "f", mod: true, shift: true }],
+    label: `${MOD}+Shift+F`,
+    accel: A("Shift+F"),
+  },
+  {
     id: "closeTab",
     chords: [{ key: "w", mod: true }],
     label: `${MOD}+W`,

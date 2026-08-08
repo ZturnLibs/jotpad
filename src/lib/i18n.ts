@@ -55,6 +55,7 @@ const zhCN: Dict = {
   "edit.findNext": "查找下一个",
   "edit.findPrev": "查找上一个",
   "edit.replace": "替换…",
+  "edit.crossSearch": "在文件中查找…",
   "edit.goto": "转到…",
   "edit.selectAll": "全选",
   "edit.timeDate": "时间/日期",
@@ -154,6 +155,16 @@ const zhCN: Dict = {
   "find.noMatch": "未找到",
   "find.replaceInfo": "已替换 {n} 处",
 
+  // Cross-file search
+  "crossSearch.title": "在文件中查找",
+  "crossSearch.placeholder": "搜索文件内容…",
+  "crossSearch.scanning": "搜索中…",
+  "crossSearch.noResults": "无结果",
+  "crossSearch.caseSensitive": "区分大小写",
+  "crossSearch.regexp": "正则",
+  "crossSearch.wholeWord": "整词",
+  "crossSearch.results": "{n} 个结果 · {m} 个文件",
+
   // Goto
   "goto.title": "转到行",
   "goto.line": "行号",
@@ -164,6 +175,7 @@ const zhCN: Dict = {
   "quickOpen.openTab": "已打开",
   "quickOpen.badgeOpen": "打开中",
   "quickOpen.badgeRecent": "最近",
+  "quickOpen.badgeDir": "目录",
 
   // Dialogs
   "dialog.saveChangesTitle": "Jotpad",
@@ -336,6 +348,7 @@ const en: Dict = {
   "edit.findNext": "Find Next",
   "edit.findPrev": "Find Previous",
   "edit.replace": "Replace…",
+  "edit.crossSearch": "Find in Files…",
   "edit.goto": "Go To…",
   "edit.selectAll": "Select All",
   "edit.timeDate": "Time/Date",
@@ -429,6 +442,16 @@ const en: Dict = {
   "find.noMatch": "No results",
   "find.replaceInfo": "Replaced {n} occurrences",
 
+  // Cross-file search
+  "crossSearch.title": "Find in Files",
+  "crossSearch.placeholder": "Search file contents…",
+  "crossSearch.scanning": "Searching…",
+  "crossSearch.noResults": "No results",
+  "crossSearch.caseSensitive": "Match case",
+  "crossSearch.regexp": "Regex",
+  "crossSearch.wholeWord": "Whole word",
+  "crossSearch.results": "{n} results · {m} files",
+
   "goto.title": "Go to Line",
   "goto.line": "Line number",
 
@@ -438,6 +461,7 @@ const en: Dict = {
   "quickOpen.openTab": "Open tab",
   "quickOpen.badgeOpen": "Open",
   "quickOpen.badgeRecent": "Recent",
+  "quickOpen.badgeDir": "Folder",
 
   "dialog.saveChangesTitle": "Jotpad",
   "dialog.saveChangesMsg": "Do you want to save changes to {name}?",

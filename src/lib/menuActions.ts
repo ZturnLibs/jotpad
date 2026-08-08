@@ -192,6 +192,7 @@ export function getMenuModel(): MenuModel {
     { id: "findNext", label: t("edit.findNext"), ...sc("findNext") },
     { id: "findPrev", label: t("edit.findPrev"), ...sc("findPrev") },
     { id: "replace", label: t("edit.replace"), ...sc("replace") },
+    { id: "crossSearch", label: t("edit.crossSearch"), ...sc("crossSearch") },
     { id: "goto", label: t("edit.goto"), ...sc("goto") },
     { id: "voice", label: t("edit.voice"), ...sc("voice") },
     { sep: true },
@@ -396,6 +397,9 @@ export function runMenuAction(id: string): void {
       break;
     case "replace":
       s.setReplaceOpen(true);
+      break;
+    case "crossSearch":
+      s.setCrossSearchOpen(true);
       break;
     case "goto":
       s.setGotoOpen(true);

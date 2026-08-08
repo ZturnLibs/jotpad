@@ -155,6 +155,133 @@ fn delete_file(path: String) -> Result<(), String> {
     fs::remove_file(path).map_err(|e| e.to_string())
 }
 
+#[derive(Serialize)]
+struct DirEntry {
+    path: String,
+    name: String,
+    rel: String,
+    size: u64,
+    mtime_ms: u64,
+}
+
+/// Skip these names during directory traversal (noise / VCS / cycles).
+const SKIP_NAMES: &[&str] = &["node_modules", ".git", ".svn", ".DS_Store", "target", "dist"];
+
+/// Default text-like extensions (lowercase, no dot).
+const DEFAULT_TEXT_EXTS: &[&str] = &[
+    "md", "markdown", "mdx", "txt", "log", "csv", "tsv", "json", "json5", "org", "rst",
+    "html", "htm", "xml", "yml", "yaml", "toml", "ini", "cfg", "conf", "tex", "creole",
+];
+
+/// Files larger than this are skipped during enumeration.
+const ENUM_BIG_FILE: u64 = 2_000_000;
+
+/// Enumerate text files under `dir`. Skips hidden/VCS/junk, filters by extension,
+/// skips files larger than ~2MB and symlinks, caps the count, sorts by mtime desc.
+#[tauri::command]
+fn list_dir_files(
+    dir: String,
+    recursive: bool,
+    max_files: Option<usize>,
+    exts: Option<Vec<String>>,
+) -> Result<Vec<DirEntry>, String> {
+    let root = std::path::Path::new(dir.trim_start_matches("file://"));
+    if !root.is_dir() {
+        return Err("not a directory".into());
+    }
+    let max = max_files.unwrap_or(1000);
+    let allowed: Vec<String> = exts
+        .map(|v| {
+            v.into_iter()
+                .map(|e| e.trim_start_matches('.').to_lowercase())
+                .collect()
+        })
+        .unwrap_or_else(|| DEFAULT_TEXT_EXTS.iter().map(|s| s.to_string()).collect());
+    let ext_set: std::collections::HashSet<String> = allowed.into_iter().collect();
+
+    let mut out: Vec<DirEntry> = Vec::new();
+    // (base, current_dir)
+    let mut stack: Vec<(std::path::PathBuf, std::path::PathBuf)> =
+        vec![(root.to_path_buf(), root.to_path_buf())];
+    while let Some((base, cur)) = stack.pop() {
+        if out.len() >= max {
+            break;
+        }
+        let entries = match fs::read_dir(&cur) {
+            Ok(e) => e,
+            Err(_) => continue,
+        };
+        for ent in entries {
+            if out.len() >= max {
+                break;
+            }
+            let ent = match ent {
+                Ok(e) => e,
+                Err(_) => continue,
+            };
+            let name = ent.file_name().to_string_lossy().to_string();
+            // skip hidden and known junk
+            if name.starts_with('.') || SKIP_NAMES.contains(&name.as_str()) {
+                continue;
+            }
+            let ft = match ent.file_type() {
+                Ok(t) => t,
+                Err(_) => continue,
+            };
+            // Symlinks: skip (don't follow) to avoid cycles and dupes.
+            if ft.is_symlink() {
+                continue;
+            }
+            let path = ent.path();
+            if ft.is_dir() {
+                if recursive {
+                    stack.push((base.clone(), path));
+                }
+                continue;
+            }
+            if !ft.is_file() {
+                continue;
+            }
+            let ext_ok = path
+                .extension()
+                .and_then(|e| e.to_str())
+                .map(|e| ext_set.contains(&e.to_lowercase()))
+                .unwrap_or(false);
+            if !ext_ok {
+                continue;
+            }
+            let meta = match fs::metadata(&path) {
+                Ok(m) => m,
+                Err(_) => continue,
+            };
+            if meta.len() > ENUM_BIG_FILE {
+                continue;
+            }
+            let mtime_ms = meta
+                .modified()
+                .ok()
+                .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                .map(|d| d.as_millis() as u64)
+                .unwrap_or(0);
+            let rel = path
+                .strip_prefix(&base)
+                .unwrap_or(&path)
+                .to_string_lossy()
+                .to_string();
+            out.push(DirEntry {
+                path: path.to_string_lossy().to_string(),
+                name,
+                rel,
+                size: meta.len(),
+                mtime_ms,
+            });
+        }
+    }
+    out.sort_by(|a, b| b.mtime_ms.cmp(&a.mtime_ms));
+    out.truncate(max);
+    Ok(out)
+}
+
 #[tauri::command]
 fn write_file(
     path: String,
@@ -337,6 +464,7 @@ pub fn run() {
             file_mtime,
             rename_file,
             delete_file,
+            list_dir_files,
             read_state,
             write_state,
             set_app_menu,

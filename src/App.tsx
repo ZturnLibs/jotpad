@@ -20,6 +20,7 @@ import { ContextMenu } from "@/components/ContextMenu";
 import { PageSetup } from "@/components/PageSetup";
 import { DiffDialog } from "@/components/DiffDialog";
 import { QuickOpen } from "@/components/QuickOpen";
+import { CrossSearch } from "@/components/CrossSearch";
 import { About, ConfirmDialog, GotoDialog, ReloadDialog, SessionNameDialog } from "@/components/Dialogs";
 import { HistoryPanel } from "@/components/HistoryPanel";
 import { ToastHost } from "@/components/ToastHost";
@@ -340,6 +341,7 @@ export function App() {
       )}
       <ContextMenu />
       <QuickOpen />
+      <CrossSearch />
       <ConfirmDialog />
       <SessionNameDialog />
       <ReloadDialog />

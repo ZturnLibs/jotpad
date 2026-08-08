@@ -47,6 +47,28 @@ export function deleteFile(path: string): Promise<void> {
   return invoke<void>("delete_file", { path });
 }
 
+export interface DirEntry {
+  path: string;
+  name: string;
+  /** Path relative to the enumerated root (for display). */
+  rel: string;
+  size: number;
+  mtime_ms: number;
+}
+
+/** Enumerate text files under `dir` (recursive, mtime desc, capped). */
+export function listDirFiles(
+  dir: string,
+  opts?: { recursive?: boolean; maxFiles?: number; exts?: string[] },
+): Promise<DirEntry[]> {
+  return invoke<DirEntry[]>("list_dir_files", {
+    dir,
+    recursive: opts?.recursive ?? true,
+    maxFiles: opts?.maxFiles ?? null,
+    exts: opts?.exts ?? null,
+  });
+}
+
 /** Write text to the OS clipboard. */
 export function clipboardWriteText(text: string): Promise<void> {
   return invoke<void>("clipboard_write_text", { text });

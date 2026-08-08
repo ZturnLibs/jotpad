@@ -1,20 +1,23 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { useStore } from "@/store/useStore";
 import { useT } from "@/lib/i18n";
-import { basename } from "@/lib/backend";
+import { basename, listDirFiles, resolveDefaultSaveDirectory, type DirEntry } from "@/lib/backend";
 import { fuzzyFilter } from "@/lib/fuzzy";
 import { getEditorView } from "@/lib/editorRef";
 import { MOD } from "@/lib/utils";
 
 type QuickItem =
   | { kind: "tab"; id: string; label: string; detail: string }
-  | { kind: "recent"; path: string; label: string; detail: string };
+  | { kind: "recent"; path: string; label: string; detail: string }
+  | { kind: "dir"; path: string; label: string; detail: string };
 
 export function QuickOpen() {
   const open = useStore((s) => s.quickOpenOpen);
   const setOpen = useStore((s) => s.setQuickOpenOpen);
   const tabs = useStore((s) => s.tabs);
   const recentFiles = useStore((s) => s.recentFiles);
+  const defaultSaveDirectory = useStore((s) => s.settings.defaultSaveDirectory);
+  const [dirFiles, setDirFiles] = useState<DirEntry[]>([]);
   const setActiveTab = useStore((s) => s.setActiveTab);
   const openPath = useStore((s) => s.openPath);
   const t = useT();
@@ -23,6 +26,24 @@ export function QuickOpen() {
   const [index, setIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const dir = await resolveDefaultSaveDirectory(defaultSaveDirectory);
+        if (!dir || cancelled) return;
+        const entries = await listDirFiles(dir, { recursive: true, maxFiles: 1000 });
+        if (!cancelled) setDirFiles(entries);
+      } catch {
+        /* 无可用目录：降级为 tabs + recents */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, defaultSaveDirectory]);
 
   const items = useMemo(() => {
     const openPaths = new Set(tabs.map((tb) => tb.filePath).filter(Boolean) as string[]);
@@ -34,15 +55,14 @@ export function QuickOpen() {
     }));
     const recentItems: QuickItem[] = recentFiles
       .filter((p) => !openPaths.has(p))
-      .map((path) => ({
-        kind: "recent" as const,
-        path,
-        label: basename(path),
-        detail: path,
-      }));
-    const all = [...tabItems, ...recentItems];
+      .map((path) => ({ kind: "recent" as const, path, label: basename(path), detail: path }));
+    const recentPaths = new Set(recentFiles);
+    const dirItems: QuickItem[] = dirFiles
+      .filter((e) => !openPaths.has(e.path) && !recentPaths.has(e.path))
+      .map((e) => ({ kind: "dir" as const, path: e.path, label: e.name, detail: e.rel }));
+    const all = [...tabItems, ...recentItems, ...dirItems];
     return fuzzyFilter(all, query, (it) => `${it.label} ${it.detail}`);
-  }, [tabs, recentFiles, query, t]);
+  }, [tabs, recentFiles, dirFiles, query, t]);
 
   useEffect(() => {
     if (!open) return;
@@ -120,7 +140,7 @@ export function QuickOpen() {
           ) : (
             items.map((item, i) => (
               <div
-                key={item.kind === "tab" ? `tab-${item.id}` : `recent-${item.path}`}
+                key={item.kind === "tab" ? `tab-${item.id}` : item.kind === "recent" ? `recent-${item.path}` : `dir-${item.path}`}
                 data-qi={i}
                 role="option"
                 aria-selected={i === index}
@@ -129,7 +149,11 @@ export function QuickOpen() {
                 onClick={() => pick(item)}
               >
                 <span className="quick-open-badge">
-                  {item.kind === "tab" ? t("quickOpen.badgeOpen") : t("quickOpen.badgeRecent")}
+                  {item.kind === "tab"
+                    ? t("quickOpen.badgeOpen")
+                    : item.kind === "recent"
+                      ? t("quickOpen.badgeRecent")
+                      : t("quickOpen.badgeDir")}
                 </span>
                 <span className="quick-open-label">{item.label}</span>
                 <span className="quick-open-detail muted" title={item.detail}>
