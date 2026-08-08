@@ -237,6 +237,11 @@ export function getMenuModel(): MenuModel {
       checked: s.settings.showStatusBar,
     },
     {
+      id: "readOnly",
+      label: t("view.readOnly"),
+      checked: activeTab?.readOnly ?? false,
+    },
+    {
       id: "theme",
       label: t("view.theme"),
       submenu: (["light", "dark", "system"] as ThemeMode[]).map((m) => ({
@@ -436,6 +441,9 @@ export function runMenuAction(id: string): void {
       break;
     case "statusBar":
       s.setSettings({ showStatusBar: !s.settings.showStatusBar });
+      break;
+    case "readOnly":
+      s.toggleReadOnly();
       break;
     case "settings":
       s.setSettingsOpen(true);

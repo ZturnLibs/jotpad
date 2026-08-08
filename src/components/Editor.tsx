@@ -9,7 +9,7 @@ import {
   lineNumbers,
 } from "@codemirror/view";
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
-import { findNext, findPrevious, search } from "@codemirror/search";
+import { findNext, findPrevious, search, selectSelectionMatches } from "@codemirror/search";
 import { useStore } from "@/store/useStore";
 import { emitEditorInfo, setEditorView, viewInfo } from "@/lib/editorRef";
 
@@ -25,6 +25,7 @@ export function Editor() {
   const wrapCompartment = useRef(new Compartment());
   const guttersCompartment = useRef(new Compartment());
   const spellCompartment = useRef(new Compartment());
+  const readOnlyCompartment = useRef(new Compartment());
   const loadingRef = useRef(false);
   const prevTabIdRef = useRef<string | null>(null);
 
@@ -46,6 +47,9 @@ export function Editor() {
           history(),
           drawSelection(),
           EditorState.allowMultipleSelections.of(true),
+          readOnlyCompartment.current.of(
+            store.activeTab()?.readOnly ? EditorState.readOnly.of(true) : [],
+          ),
           wrapCompartment.current.of(
             store.settings.wordWrap ? EditorView.lineWrapping : [],
           ),
@@ -56,6 +60,7 @@ export function Editor() {
           keymap.of([
             ...defaultKeymap,
             ...historyKeymap,
+            { key: "Mod-d", run: selectSelectionMatches },
             { key: "F3", run: findNext, shift: findPrevious },
           ]),
           highlightActiveLine(),
@@ -142,6 +147,14 @@ export function Editor() {
       effects: spellCompartment.current.reconfigure(spellcheckExt(!!settings.spellCheck)),
     });
   }, [settings.spellCheck]);
+
+  useEffect(() => {
+    viewRef.current?.dispatch({
+      effects: readOnlyCompartment.current.reconfigure(
+        tab?.readOnly ? EditorState.readOnly.of(true) : [],
+      ),
+    });
+  }, [tab?.readOnly]);
 
   const fontSize = settings.fontSize * (settings.zoom / 100);
 

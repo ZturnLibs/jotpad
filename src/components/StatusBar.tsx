@@ -24,6 +24,7 @@ export function StatusBar() {
   const setEncoding = useStore((s) => s.setEncoding);
   const setLineEnding = useStore((s) => s.setLineEnding);
   const toggleAlwaysOnTop = useStore((s) => s.toggleAlwaysOnTop);
+  const toggleReadOnly = useStore((s) => s.toggleReadOnly);
   const t = useT();
   const [info, setInfo] = useState(initial);
 
@@ -71,6 +72,15 @@ export function StatusBar() {
       >
         {alwaysOnTop ? t("status.pinned") : t("status.pin")}
       </span>
+      {activeTab?.readOnly ? (
+        <span
+          className="sb-item sb-click sb-on"
+          onClick={() => toggleReadOnly()}
+          title={t("view.readOnly")}
+        >
+          {t("status.readOnly")}
+        </span>
+      ) : null}
       <span
         className="sb-item sb-click"
         onClick={() => setSettings({ zoom: 100 })}

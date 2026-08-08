@@ -102,6 +102,7 @@ const zhCN: Dict = {
   "view.language": "语言",
   "view.encoding": "编码",
   "view.lineEnding": "行尾",
+  "view.readOnly": "只读",
 
   // Window menu
   "window.nextTab": "下一个标签页",
@@ -190,6 +191,7 @@ const zhCN: Dict = {
   "status.lines": "行",
   "status.zoom": "缩放",
   "status.encoding": "编码",
+  "status.readOnly": "只读",
   "status.pin": "置顶",
   "status.pinned": "已置顶",
 
@@ -370,6 +372,7 @@ const en: Dict = {
   "view.language": "Language",
   "view.encoding": "Encoding",
   "view.lineEnding": "Line Ending",
+  "view.readOnly": "Read-only",
 
   "window.nextTab": "Next Tab",
   "window.prevTab": "Previous Tab",
@@ -451,6 +454,7 @@ const en: Dict = {
   "status.lines": "lines",
   "status.zoom": "Zoom",
   "status.encoding": "Encoding",
+  "status.readOnly": "Read-only",
   "status.pin": "Pin",
   "status.pinned": "Pinned",
 

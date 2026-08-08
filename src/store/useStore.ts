@@ -31,6 +31,9 @@ import {
 
 const STATE_VERSION = 2;
 const MAX_RECENT = 20;
+
+/** Files larger than this are opened read-only to avoid lag. */
+const BIG_FILE_THRESHOLD = 2_000_000;
 const MAX_SESSIONS = 20;
 /** 自己写入后忽略外部变更检测的宽限期（Documents/iCloud 等可能立刻再改 mtime）。 */
 const SELF_WRITE_GRACE_MS = 4000;
@@ -148,6 +151,7 @@ interface Store {
   setEncoding: (encoding: Encoding) => void;
   setLineEnding: (le: LineEnding) => void;
   toggleBom: () => void;
+  toggleReadOnly: () => void;
 
   // UI setters
   setFindOpen: (v: boolean) => void;
@@ -190,6 +194,7 @@ function makeUntitled(encoding: Encoding = "UTF-8"): TabState {
     hasBom: false,
     lineEnding: "CRLF",
     dirty: false,
+    readOnly: false,
     size: 0,
     diskMtimeMs: null,
     selection: null,
@@ -200,6 +205,7 @@ function makeUntitled(encoding: Encoding = "UTF-8"): TabState {
 function normalizeTab(t: TabState): TabState {
   return {
     ...t,
+    readOnly: t.readOnly ?? false,
     diskMtimeMs: typeof t.diskMtimeMs === "number" ? t.diskMtimeMs : null,
   };
 }
@@ -289,6 +295,7 @@ async function loadTabFromPath(path: string): Promise<TabState | null> {
       hasBom: r.has_bom,
       lineEnding: r.line_ending,
       dirty: false,
+      readOnly: r.size > BIG_FILE_THRESHOLD,
       size: r.size,
       diskMtimeMs: r.mtime_ms,
       selection: null,
@@ -493,6 +500,7 @@ export const useStore = create<Store>((set, get) => ({
         hasBom: r.has_bom,
         lineEnding: r.line_ending,
         dirty: false,
+        readOnly: r.size > BIG_FILE_THRESHOLD,
         size: r.size,
         diskMtimeMs: r.mtime_ms,
         selection: null,
@@ -891,6 +899,12 @@ export const useStore = create<Store>((set, get) => ({
     const id = get().activeTabId;
     const tab = get().activeTab();
     if (id && tab) get().updateTab(id, { hasBom: !tab.hasBom, dirty: true });
+  },
+
+  toggleReadOnly: () => {
+    const id = get().activeTabId;
+    const tab = get().activeTab();
+    if (id && tab) get().updateTab(id, { readOnly: !tab.readOnly });
   },
 
   setFindOpen: (v) => set({ findOpen: v, replaceOpen: v ? get().replaceOpen : false }),

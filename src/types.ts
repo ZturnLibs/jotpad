@@ -56,6 +56,8 @@ export interface TabState {
   lineEnding: LineEnding;
   /** True if there are unsaved edits. */
   dirty: boolean;
+  /** Read-only mode (auto-enabled for very large files, toggled via menu). */
+  readOnly: boolean;
   /** Last known on-disk size in bytes. */
   size: number;
   /** Last known on-disk mtime (ms since epoch), or null for untitled. */
