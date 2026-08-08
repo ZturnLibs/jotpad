@@ -3,6 +3,7 @@ mod app_log;
 mod history;
 mod menu;
 mod shell_integration;
+mod tray;
 mod voice;
 
 use encoding_rs::{BIG5, EUC_KR, GBK, SHIFT_JIS, UTF_8, UTF_16BE, UTF_16LE, WINDOWS_1252, Encoding};
@@ -315,6 +316,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .manage(voice::VoiceDownloadFlag::default())
         .invoke_handler(tauri::generate_handler![
             read_file,
@@ -367,6 +369,20 @@ pub fn run() {
 
             // Refresh shell integrations so context-menu commands keep a current exe path.
             shell_integration::resync_if_enabled(app.handle());
+
+            // System tray icon (left-click toggles window; right-click menu).
+            tray::setup(app.handle())?;
+
+            // Global shortcut: bring the main window to front from anywhere.
+            use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
+            app.global_shortcut().on_shortcut("CmdOrCtrl+Shift+J", move |app, _s, event| {
+                if event.state() == ShortcutState::Pressed {
+                    if let Some(w) = app.get_webview_window("main") {
+                        let _ = w.show();
+                        let _ = w.set_focus();
+                    }
+                }
+            })?;
             Ok(())
         })
         .build(tauri::generate_context!())

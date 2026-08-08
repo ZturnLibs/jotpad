@@ -299,6 +299,17 @@ export function App() {
     };
   }, [ready]);
 
+  // Tray menu → new tab.
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    listen<string>("tray://click", (e) => {
+      if (e.payload === "new") useStore.getState().newTab();
+    }).then((fn) => {
+      unlisten = fn;
+    });
+    return () => unlisten?.();
+  }, []);
+
   if (!ready) {
     return (
       <div className="app" style={{ alignItems: "center", justifyContent: "center" }}>
