@@ -1,241 +1,214 @@
 # 跨文件全文搜索 · 技术设计
 
-> 状态：设计完成，待实现
+> 状态：设计完成（v2，纳入默认保存目录范围），待实现
 > 日期：2025-08-08
 > 关联：`docs/research-text-editor-needs.md`（需求 #1，最高置信缺口）
-> 目标：让用户在"自己的笔记全集"里快速找到包含某段文字的文件，并跳转到具体位置。
+> 目标：让用户在自己的"笔记全集"里快速找到包含某段文字的文件并跳转，也能按文件名快速打开。
 
 ---
 
-## 一、目标与范围
+## 一、范围：默认保存目录 = 事实笔记根
 
-### 需求依据
+Jotpad 虽无显式 workspace，但**每个系统都有默认保存目录**：
 
-调研报告第一条强需求（HN 三源一致）："*ability to quickly **search** years worth of notes*"、*"not able to quickly search an old note*"。当前 Jotpad 只有**单文件** FindBar + **文件名** QuickOpen，缺**内容级跨文件搜索**。
+- 用户可设 `settings.defaultSaveDirectory`；未设则回落系统文档目录（`documentsDir()`）。
+- 解析函数已存在：`resolveDefaultSaveDirectory(override)`（`backend.ts`）。
 
-### 搜索范围：为什么是「打开的标签 + 最近文件」
+→ **这个目录就是用户的笔记根**。本设计把它作为主搜索范围，驱动三个能力（用户原话）：
 
-Jotpad 是**无 workspace 概念**的多标签记事本——用户的"笔记全集"天然由两部分构成：
+1. **快速打开**（QuickOpen 增强）：按文件名在该目录里模糊查找，`Cmd/Ctrl+P` 能找到"从没打开过"的文件。
+2. **跨文件搜索**（CrossSearch 新增）：按内容在该目录里全文检索，`Cmd/Ctrl+Shift+F`。
 
-1. **打开的标签**（tabs）：内存中的 `content`，即时可搜。
-2. **最近文件**（recentFiles，上限 `MAX_RECENT = 20`）：用户的历史笔记路径，需读盘。
+合并后的**搜索源**（优先级降序）：
 
-这两者就是 Jotpad 语境下最自然的"我的笔记"集合，且 **recents 有界（≤20）**，纯前端读盘+缓存即可，**无需新增 Rust 命令**。
+| 源 | 获取方式 | 备注 |
+|----|---------|------|
+| 打开的 tabs | `tab.content`（内存） | 即时；已打开的优先 |
+| 最近文件 recentFiles（≤20） | `readFile(path)` 缓存 | 工作记忆 |
+| **默认保存目录文件** | 新增 Rust `list_dir_files` 枚举 + `readFile` 批量读 | **笔记全集**，本次新增 |
 
-> 不采用「文件夹/工作区搜索」作为 MVP：Jotpad 没有 workspace 概念，每次选目录是额外摩擦。文件夹搜索作为 **Tier-2 增强**（见第九节），需要新增 Rust 遍历命令，不在首版。
+> 范围解析失败（无 defaultSaveDirectory 且无系统文档目录）时，自动降级为 tabs+recents，功能不中断。
 
 ### 范围
 
-- ✅ 在「tabs + recents」范围内做内容搜索（大小写/正则/整词）
-- ✅ 结果按文件分组，显示 `路径:行号` + 命中预览（高亮）
-- ✅ 选中结果 → 打开文件 → 跳转到命中位置 →（可选）同步单文件搜索便于继续翻
-- ❌ 不做：替换（跨文件替换风险高，先不做）、文件夹递归搜索（Tier-2）
+- ✅ 在「tabs + recents + 保存目录」内做**内容搜索**（大小写/正则/整词）
+- ✅ 在保存目录内做**文件名快速打开**
+- ✅ 结果按文件分组，显示 `相对路径:行号` + 命中预览（高亮）
+- ✅ 选中 → 打开文件 → 跳转命中位置
+- ❌ 不做：跨文件替换（风险高）、保存目录之外的任意文件夹（Tier-2）
 
 ---
 
 ## 二、现状与可复用件
 
-| 现有件 | 复用方式 |
-|--------|---------|
-| `src/lib/search.ts` → `buildMatcher(q)` / `escapeRegExp` | 直接复用，统一大小写/正则语义 |
-| `src/lib/fuzzy.ts` | 不复用（这是精确内容匹配，非模糊文件名） |
-| `backend.ts` → `readFile(path): Promise<ReadResult>` | 读取 recent 文件内容 |
-| `QuickOpen.tsx` | UI/交互范式参照（overlay + 列表 + 键盘导航） |
-| store → `tabs[].content` / `recentFiles` | 搜索数据源 |
-| store 模式 → `quickOpenOpen` / `setQuickOpenOpen` | 仿照加 `crossSearchOpen` |
+| 现有件 | 复用 |
+|--------|------|
+| `backend.ts` → `readFile` | 读取文件内容（tabs/recents/dir 文件统一） |
+| `backend.ts` → `resolveDefaultSaveDirectory` / `documentsDir` | 解析保存目录 |
+| `backend.ts` → `basename` / `dirname` | 路径展示 |
+| `src/lib/search.ts` → `buildMatcher` / `escapeRegExp` | 统一大小写/正则语义 |
+| `QuickOpen.tsx` | 文件名打开的 UI/交互范式，将增强其数据源 |
+| store → `tabs[].content` / `recentFiles` / `settings.defaultSaveDirectory` | 数据源 |
+| **需新增**：Rust `list_dir_files` | JS 无法列目录（沙箱），唯一必须的新后端能力 |
 
 ---
 
-## 三、整体架构（纯前端，无 Rust 改动）
+## 三、新增 Rust 命令：`list_dir_files`（唯一后端改动）
 
-```
-┌─ CrossSearch.tsx (overlay 组件) ─────────────────────────┐
-│  query input  [Aa] [.*] [\b]   ← 大小写/正则/整词          │
-│  ─────────────────────────────────────────────────────  │
-│  📄 notes.md · /path/notes.md                 3 个匹配   │  ← FileHit
-│      12  ...命中行的预览，<mark>关键词</mark>高亮...       │  ← LineHit
-│      47  ...                                              │
-│  📄 todo.txt · ...                                        │
-└──────────────────────────────────────────────────────────┘
-        │ 选中命中
-        ▼
-  openPath(path) / setActiveTab(id)  →  view.dispatch({selection})  →  focus
+JS 在 Tauri 沙箱内无法列举目录，故新增一个**纯 std 实现**（不加 crate）的枚举命令。它同时服务于 QuickOpen 与 CrossSearch。
+
+```rust
+#[derive(serde::Serialize)]
+struct DirEntry {
+    path: String,       // 绝对路径
+    name: String,       // 文件名
+    rel: String,        // 相对根目录的路径（展示用）
+    size: u64,
+    mtime_ms: u64,
+}
+
+#[tauri::command]
+fn list_dir_files(
+    dir: String,
+    recursive: bool,        // 是否递归子目录
+    max_files: usize,       // 数量上限，默认 1000
+    exts: Vec<String>,      // 允许的扩展名（小写无点）；空=用内置文本默认
+) -> Result<Vec<DirEntry>, String>
 ```
 
-**数据流**：打开面板时后台并行读取 recents → 缓存 `Map<path, string>`；每次输入（防抖 200ms）对 `tabs.content + 缓存` 跑匹配 → 结构化结果 → 渲染。
+**遍历规则**：
+- `recursive=true` 时递归，深度不限但受 `max_files` 截断。
+- 跳过隐藏（`.` 开头）、跳过 `.git` / `node_modules` / `.DS_Store` 等噪声。
+- 仅保留**文本类扩展名**（默认：`md markdown txt log csv json org rst html xml yml yaml toml ini`）；可被 `exts` 覆盖。
+- 跳过 `> BIG_FILE(2MB)`，跳过符号链接（避免环）。
+- 按 mtime 降序返回（最近改动的在前，QuickOpen 默认排序也更合理）。
+
+> 注册：加入 `generate_handler![]` 列表。`backend.ts` 加 `listDirFiles(dir, opts)` 包装。
+
+**为何不在 Rust 里做匹配**：保持后端"笨且快"、匹配逻辑只活在 JS（复用 `crossSearch.ts`，大小写/正则/整词语义统一）。文件读取复用现有 `readFile`（带编码检测/归一化），JS 侧并发限流（≤8）批量读，避免 N 次 IPC 串行。
 
 ---
 
-## 四、核心模块：`src/lib/crossSearch.ts`
+## 四、核心匹配模块：`src/lib/crossSearch.ts`（与 v1 一致，范围扩大）
 
 ### 4.1 数据模型
 
 ```ts
-/** 一条命中：所在行、列、文档绝对偏移、整行文本（已 trim）。 */
-export interface LineHit {
-  line: number;     // 1-based
-  col: number;      // 1-based
-  from: number;     // 文本内绝对偏移（用于跳转选区）
-  to: number;
-  text: string;     // 行文本（超长截断到 ~120 字符）
-}
-
-/** 一个文件的命中集合。 */
+export interface LineHit { line: number; col: number; from: number; to: number; text: string; }
 export interface FileHit {
-  key: string;            // tab.id 或 path
-  path: string | null;
-  label: string;          // 文件名 / "新建"
-  tabId: string | null;   // 来自打开的 tab 则有值
-  matchCount: number;     // 该文件总命中数（lines 可能被截断）
-  lines: LineHit[];       // 展示用，已封顶
+  key: string; path: string | null; label: string; rel: string | null;
+  tabId: string | null; matchCount: number; lines: LineHit[];
 }
-
-/** 搜索源：抽象 tab 与 recent 的统一接口。 */
 export interface SearchSource {
-  key: string;
-  path: string | null;
-  label: string;
-  tabId: string | null;
+  key: string; path: string | null; label: string; rel: string | null; tabId: string | null;
   getText(): string | Promise<string>;
 }
 ```
 
-### 4.2 匹配函数（复用 search.ts 的 matcher）
+### 4.2 匹配函数（复用 buildMatcher）
 
 ```ts
 import { buildMatcher } from "@/lib/search";
+const MAX_LINES_PER_FILE = 50, MAX_TOTAL_HITS = 200, BIG_FILE = 2_000_000;
 
-const MAX_LINE_LEN = 120;     // 预览行截断
-const MAX_LINES_PER_FILE = 50;
-const MAX_TOTAL_HITS = 200;
-const BIG_FILE = 2_000_000;   // 跳过 >2MB
-
-/** 对单个文本跑匹配，返回行级命中（带绝对偏移）。 */
-export function searchText(
-  text: string,
-  re: RegExp,
-  cap = MAX_LINES_PER_FILE,
-): LineHit[] {
-  const hits: LineHit[] = [];
-  re.lastIndex = 0;
-  let m: RegExpExecArray | null;
-  let line = 1, lineStart = 0, nextLF = text.indexOf("\n");
-  const advance = (upto: number) => {
-    for (let i = lineStart; i < upto; i++) if (text.charCodeAt(i) === 10) { line++; lineStart = i + 1; }
-  };
-  while ((m = re.exec(text)) !== null) {
-    if (m[0].length === 0) { re.lastIndex++; continue; }
-    advance(m.index);
-    const col = m.index - lineStart + 1;
-    // 取整行文本
-    let le = nextLF; // 简化：后续实现里用当前 line 的 LF
-    hits.push({ line, col, from: m.index, to: m.index + m[0].length,
-                text: trimLine(text, lineStart, le) });
-    if (hits.length >= cap) break;
-  }
-  return hits;
-}
-
-/** 对一批源跑搜索，返回按文件分组、命中数降序的结果。 */
-export async function searchFiles(
-  sources: SearchSource[],
-  re: RegExp,
-): Promise<FileHit[]> {
-  const out: FileHit[] = [];
-  let total = 0;
-  for (const src of sources) {
-    if (total >= MAX_TOTAL_HITS) break;
-    let text: string;
-    try { text = await src.getText(); } catch { continue; }
-    if (text.length > BIG_FILE) continue;
-    if (isBinary(text)) continue;
-    const lines = searchText(text, re);
-    if (!lines.length) continue;
-    out.push({ key: src.key, path: src.path, label: src.label, tabId: src.tabId,
-               matchCount: lines.length, lines });
-    total += lines.length;
-  }
-  return out.sort((a, b) => b.matchCount - a.matchCount);
-}
+export function searchText(text: string, re: RegExp, cap = MAX_LINES_PER_FILE): LineHit[] { /* 逐行扫描，行内 exec，记录绝对偏移与行号/列 */ }
+export async function searchFiles(sources: SearchSource[], re: RegExp): Promise<FileHit[]> { /* 并发读+匹配，封顶，按命中数降序 */ }
 ```
 
-> `searchText` 的换行追踪在上文为示意骨架；实现时按"逐行扫描 + 行内 exec"的稳妥写法（避免全局 lastIndex 与行偏移错位）。
-
-### 4.3 二进制检测
+### 4.3 搜索源构造（新增目录源）
 
 ```ts
-function isBinary(text: string): boolean {
-  // 前 8000 字符内出现 NUL，或非文本字符占比过高 → 视为二进制跳过
-  const sample = text.length > 8000 ? text.slice(0, 8000) : text;
-  if (sample.includes("\u0000")) return true;
-  return false;
+// 并发限流读取
+async function pooled<T, R>(items: T[], n: number, fn: (t: T) => Promise<R>): Promise<R[]> { /* 简易信号量 */ }
+
+export async function buildSources(opts: {
+  tabs: TabState[]; recentFiles: string[]; dirEntries: DirEntry[]; cache: Map<string, string>;
+}): Promise<SearchSource[]> {
+  const seen = new Set<string>();
+  const out: SearchSource[] = [];
+  // 1) tabs（内存）
+  for (const tb of opts.tabs) {
+    const key = tb.filePath ?? tb.id;
+    if (tb.filePath) seen.add(tb.filePath);
+    out.push({ key, path: tb.filePath, label: tb.title, rel: tb.filePath, tabId: tb.id,
+               getText: () => tb.content });
+  }
+  // 2) recents（去重）+ 3) dir 文件（去重）—— 合并后并发读
+  const toRead: { path: string; label: string; rel: string }[] = [];
+  for (const p of opts.recentFiles) if (!seen.has(p)) { seen.add(p); toRead.push({path:p,label:basename(p),rel:p}); }
+  for (const e of opts.dirEntries) if (!seen.has(e.path)) { seen.add(e.path); toRead.push({path:e.path,label:e.name,rel:e.rel}); }
+  await pooled(toRead, 8, async (it) => {
+    if (opts.cache.has(it.path)) return;
+    try { opts.cache.set(it.path, (await readFile(it.path)).text); } catch { /* 跳过 */ }
+  });
+  for (const it of toRead) out.push({ key: it.path, path: it.path, label: it.label, rel: it.rel,
+                                       tabId: null, getText: () => opts.cache.get(it.path) ?? "" });
+  return out;
 }
 ```
+
+> 缓存 `Map<path, text>` 在 CrossSearch 面板生命周期内复用；QuickOpen 不需读内容（只按名匹配）。
 
 ---
 
-## 五、组件：`src/components/CrossSearch.tsx`
+## 五、QuickOpen 增强：纳入保存目录
 
-镜像 `QuickOpen.tsx` 的 overlay + 键盘导航范式，但展示**按文件分组的命中行**。
+当前 QuickOpen 源 = tabs + recents。增强为 **tabs + recents + 保存目录文件**（经 `listDirFiles`）：
 
-### 状态
+```ts
+// QuickOpen 打开时（若未缓存）后台拉取目录列表
+useEffect(() => {
+  if (!open || dirCache.current) return;
+  void (async () => {
+    const dir = await resolveDefaultSaveDirectory(settings.defaultSaveDirectory);
+    if (!dir) return;
+    try { dirCache.current = await listDirFiles(dir, { recursive:true, maxFiles:1000, exts:[] }); }
+    catch { dirCache.current = []; }
+    // 触发重算 items
+  })();
+}, [open]);
+```
+
+- 文件项加 badge「目录」区分 tabs/recents。
+- 模糊匹配 `label + rel`，recent 优先于目录冷文件。
+- 选中 → `openPath(path)`（已有逻辑复用）。
+
+> 这样 `Cmd/Ctrl+P` 真正变成"在我的笔记里找文件"，不再局限于历史记录。
+
+---
+
+## 六、CrossSearch 组件：`src/components/CrossSearch.tsx`
+
+镜像 QuickOpen 的 overlay 范式，展示**按文件分组的命中行**。
 
 ```ts
 const [query, setQuery] = useState("");
-const [opts, setOpts] = useState({ caseSensitive: false, regexp: false, wholeWord: false });
+const [opts, setOpts] = useState({ caseSensitive:false, regexp:false, wholeWord:false });
 const [results, setResults] = useState<FileHit[]>([]);
 const [scanning, setScanning] = useState(false);
-const cache = useRef<Map<string, string>>(new Map()); // path -> text
-const reqToken = useRef(0);                            // 取消过期请求
+const contentCache = useRef<Map<string,string>>(new Map());
+const dirRef = useRef<string | null>(null);
+const dirEntries = useRef<DirEntry[]>([]);
+const reqToken = useRef(0);
+
+// 打开时解析目录 + 枚举（一次）
+useEffect(() => { if (open) void warmup(); }, [open]);
+async function warmup() {
+  dirRef.current = await resolveDefaultSaveDirectory(settings.defaultSaveDirectory);
+  if (dirRef.current) try { dirEntries.current = await listDirFiles(dirRef.current, {recursive:true,maxFiles:1000,exts:[]}); } catch {}
+}
+
+// 输入防抖搜索（200ms，reqToken 取消过期）
+useEffect(() => { /* buildMatcher + 整词包裹；buildSources(tabs,recents,dirEntries,cache)；searchFiles；setResults */ }, [query, opts]);
 ```
 
-### 打开时预热缓存（后台并行读 recents）
-
-```ts
-useEffect(() => {
-  if (!open) return;
-  // recents 有界（≤20），并行读取；失败静默跳过
-  void Promise.all(recentFiles.map(async (p) => {
-    if (cache.current.has(p)) return;
-    try { cache.current.set(p, (await readFile(p)).text); } catch { /* 删除/移动 */ }
-  }));
-}, [open, recentFiles]);
-```
-
-### 构造搜索源 + 防抖搜索
-
-```ts
-useEffect(() => {
-  if (!open || !query.trim()) { setResults([]); return; }
-  const token = ++reqToken.current;
-  setScanning(true);
-  const id = setTimeout(async () => {
-    const re = buildMatcher({ search: query, caseSensitive: opts.caseSensitive,
-                              regexp: opts.regexp, replace: "" });
-    // 整词：包裹 \b...\b（仅非正则模式）
-    const finalRe = re && opts.wholeWord && !opts.regexp
-      ? new RegExp(`\\b(?:${re.source})\\b`, re.flags) : re;
-    if (!finalRe) { setResults([]); setScanning(false); return; }
-    const sources = buildSources(tabs, recentFiles, cache.current);
-    const hits = await searchFiles(sources, finalRe);
-    if (reqToken.current === token) { setResults(hits); setScanning(false); }
-  }, 200);
-  return () => clearTimeout(id);
-}, [query, opts, open, tabs, recentFiles]);
-```
-
-`buildSources`：tabs 优先（`getText: () => tab.content`），recents 去重后（`getText: () => cache.get(p) ?? ""`）。
-
-### 键盘导航与选中跳转
-
-把结果拍平成 `FlatItem = { file: FileHit; line: LineHit }`，`↑/↓` 在命中行间移动，`Enter` 跳转：
+**键盘导航**：结果拍平为 `FlatItem={file,line}`，`↑/↓` 跨行移动、`Enter` 跳转：
 
 ```ts
 const pick = async (file: FileHit, line: LineHit) => {
   setCrossSearchOpen(false);
   if (file.tabId) setActiveTab(file.tabId);
   else if (file.path) await openPath(file.path);
-  // 跳到命中偏移（doc 偏移 = 文件文本偏移，内容一致）
   requestAnimationFrame(() => {
     const v = getEditorView();
     v?.dispatch({ selection: { anchor: line.from, head: line.to }, scrollIntoView: true });
@@ -244,85 +217,73 @@ const pick = async (file: FileHit, line: LineHit) => {
 };
 ```
 
-> 可选增强：跳转后同步 CodeMirror 单文件搜索查询（`applySearchQuery`），让 `F3` 在该文件内继续翻。首版可不加。
-
-### 触发与快捷键
-
-- 快捷键 **`Cmd/Ctrl+Shift+F`**（业界通用"在文件中查找"约定）。在 `shortcuts.ts` 加 `crossSearch` 条目；`App.tsx` 的全局 keydown 已会走 `runMenuAction`。
-- 菜单：在「编辑」菜单 Find 系列下加「在文件中查找…」。
+**展示**：文件头 `📄 name · rel · n 个匹配`，其下 `行号  预览（<mark>高亮</mark>）`。
 
 ---
 
-## 六、store 改动（极小）
+## 七、store / 快捷键 / 菜单 / i18n
 
-仿照 `quickOpenOpen`：
-
-```ts
-// 类型
-crossSearchOpen: boolean;
-setCrossSearchOpen: (v: boolean) => void;
-// 初值
-crossSearchOpen: false,
-// 实现
-setCrossSearchOpen: (v) => set({ crossSearchOpen: v }),
-```
-
-`App.tsx` 在 `<QuickOpen />` 旁渲染 `<CrossSearch />`。
+- **store**：仿 `quickOpenOpen` 加 `crossSearchOpen` / `setCrossSearchOpen`。
+- **快捷键**：`crossSearch` = `Cmd/Ctrl+Shift+F`（业界"在文件中查找"约定），加入 `shortcuts.ts`。
+- **菜单**：「编辑」下 Find 系列加「在文件中查找…」→ `setCrossSearchOpen(true)`。
+- **i18n**：新增 `crossSearch.*`（title/placeholder/noResults/scanning/caseSensitive/regexp/wholeWord/results）+ QuickOpen 的「目录」badge。
 
 ---
 
-## 七、性能与边界
+## 八、性能与边界
 
 | 关注点 | 处理 |
 |--------|------|
+| 目录文件多 | `list_dir_files` 封顶 `maxFiles=1000`，按 mtime 降序 |
 | 频繁输入 | 200ms 防抖；`reqToken` 丢弃过期结果 |
-| 大文件 | `> BIG_FILE(2MB)` 跳过 |
-| 二进制 | NUL 检测跳过 |
-| 结果爆炸 | 全局封顶 `MAX_TOTAL_HITS=200`，单文件 `MAX_LINES_PER_FILE=50` |
-| 预览过长 | 行文本截断 ~120 字符 |
-| recents 已删/移动 | `readFile` 抛错静默跳过 |
-| 重复读盘 | 缓存 `Map<path,text>`，仅在面板打开时预热一次 |
-| 内存 | recents ≤20，缓存文本总量可控 |
+| 大文件 | `>2MB` 在 Rust 枚举阶段即跳过 |
+| 二进制 | 扩展名白名单 + JS 侧 NUL 检测双保险 |
+| 结果爆炸 | 全局 `MAX_TOTAL_HITS=200`，单文件 `MAX_LINES_PER_FILE=50` |
+| 读盘并发 | `pooled` 限流 ≤8，避免 IPC 风暴 |
+| 目录解析失败 | 降级 tabs+recents，功能不中断 |
+| 缓存 | 内容缓存随面板生命周期；目录列表缓存到 `dirRef` |
 
 ---
 
-## 八、实现拆解（文件清单）
+## 九、实现拆解（文件清单）
 
-| 文件 | 改动 |
-|------|------|
-| `src/lib/crossSearch.ts` | **新增**：`LineHit`/`FileHit`/`SearchSource` 类型 + `searchText` / `searchFiles` / `isBinary` |
-| `src/lib/crossSearch.test.ts` | **新增**：`searchText` 单测（多行偏移、整词、封顶、二进制跳过） |
-| `src/components/CrossSearch.tsx` | **新增**：overlay 组件（输入/开关/分组结果/键盘导航/跳转） |
-| `src/store/useStore.ts` | 加 `crossSearchOpen` / `setCrossSearchOpen` |
-| `src/lib/shortcuts.ts` | 加 `crossSearch` = `Cmd/Ctrl+Shift+F` |
-| `src/lib/menuActions.ts` | 菜单项「在文件中查找…」→ `setCrossSearchOpen(true)` |
-| `src/lib/i18n.ts` | 新增 `crossSearch.*` 中英键 |
-| `src/App.tsx` | 渲染 `<CrossSearch />` |
-| `src/styles/app.css` | 复用 `quick-open-*` 样式，加少量命中行样式 |
+| 文件 | 改动 | 类型 |
+|------|------|------|
+| `src-tauri/src/lib.rs` | 新增 `list_dir_files` 命令 + 注册 | Rust（纯 std） |
+| `src/lib/backend.ts` | `listDirFiles(dir, opts)` 包装 | TS |
+| `src/lib/crossSearch.ts` | **新增**：类型 + `searchText`/`searchFiles`/`buildSources`/`pooled`/`isBinary` | TS |
+| `src/lib/crossSearch.test.ts` | **新增**：`searchText`/`isBinary` 单测 | TS |
+| `src/components/CrossSearch.tsx` | **新增**：overlay 组件 | TSX |
+| `src/components/QuickOpen.tsx` | 增强：数据源加保存目录文件 | TSX |
+| `src/store/useStore.ts` | `crossSearchOpen` / `setCrossSearchOpen` | TS |
+| `src/lib/shortcuts.ts` | `crossSearch` 快捷键 | TS |
+| `src/lib/menuActions.ts` | 菜单项 | TS |
+| `src/lib/i18n.ts` | `crossSearch.*` + QuickOpen badge 中英 | TS |
+| `src/App.tsx` | 渲染 `<CrossSearch />` | TSX |
+| `src/styles/app.css` | 复用 quick-open 样式 + 命中行样式 | CSS |
 
-成本预估：约 1.5 天（核心 lib 半天、组件 1 天、测试与联调半天）。
-
----
-
-## 九、测试计划
-
-1. **单元**（`crossSearch.test.ts`）：
-   - 多行文本命中：行号/列/绝对偏移正确
-   - 大小写、正则、整词三种模式
-   - 单文件命中封顶 `MAX_LINES_PER_FILE`
-   - `isBinary` 对含 NUL 文本返回 true
-2. **手动**：
-   - 打开面板 → 输入关键词 → 实时分组结果
-   - `↑/↓` 在文件间/行间移动，`Enter` 跳转到正确行列
-   - 大小写/正则/整词开关生效
-   - recents 中已删除文件不报错、不显示
-   - 大文件被跳过、结果封顶不卡 UI
-3. **回归**：现有 29 测试全过；单文件 FindBar、QuickOpen 不受影响。
+成本预估：约 2 天（Rust 枚举 + 命令半天、crossSearch lib 半天、CrossSearch 组件半天、QuickOpen 增强与联调半天）。
 
 ---
 
-## 十、范围之外（后续观察项）
+## 十、测试计划
 
-- **跨文件替换**：风险高（多文件写入 + 撤销复杂），待明确需求再做。
-- **文件夹/工作区搜索（Tier-2）**：需新增 Rust 命令 `search_in_dir(dir, pattern, opts)` 递归遍历 + 读 + 匹配，返回结构化结果。适合作为「在文件夹中查找…」入口，与 MVP 并存。
-- **索引加速**：recents ≤20 不需要；若将来支持大目录，再考虑增量索引。
+1. **Rust**（手动 / `cargo test` 可选）：`list_dir_files` 递归、隐藏/噪声跳过、扩展名过滤、`max_files` 截断、mtime 排序。
+2. **单元**（`crossSearch.test.ts`）：多行命中偏移/行号/列、大小写/正则/整词、`MAX_LINES_PER_FILE` 封顶、`isBinary` NUL 检测。
+3. **手动**：
+   - `Cmd+Shift+F` → 输入词 → 实时分组结果（含保存目录文件）
+   - `↑/↓/Enter` 跳转到正确行列
+   - `Cmd+P` 能找到保存目录里"从未打开"的文件
+   - 三开关（大小写/正则/整词）生效
+   - 已删除文件、超大文件、二进制不报错不显示
+   - 目录解析失败时降级为 tabs+recents
+4. **回归**：现有测试全过；单文件 FindBar 不受影响。
+
+---
+
+## 十一、范围之外（后续）
+
+- **跨文件替换**：多文件写入 + 撤销复杂，待明确需求。
+- **任意文件夹搜索**：在保存目录之外"选择文件夹搜索"，UI 加一个目录选择入口，复用 `list_dir_files(recursive=true)`。可与默认目录并存。
+- **忽略规则**：尊重 `.gitignore` / `.jotpadignore`（需引入 `ignore` crate 或自实现，非 MVP）。
+- **增量索引**：目录很大时再做持久化索引加速。
