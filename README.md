@@ -1,5 +1,7 @@
 # Jotpad · 跨平台记事本
 
+> 文档导航：[设计决策与功能记录](DECISIONS.md) · [路线图](ROADMAP.md) · [发布流程](.agents/skills/jotpad-release/SKILL.md)
+
 Jotpad 是一款用 **Tauri 2 + React + TypeScript + CodeMirror 6** 构建的跨平台（macOS / Linux / Windows）纯文本记事本。
 
 - 左右分栏：左侧文档列表，右侧编辑区
