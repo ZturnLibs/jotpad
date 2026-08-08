@@ -14,6 +14,7 @@ import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { findNext, findPrevious, search, selectSelectionMatches } from "@codemirror/search";
 import { useStore } from "@/store/useStore";
 import { emitEditorInfo, setEditorView, viewInfo } from "@/lib/editorRef";
+import { cjkWordSelection } from "@/lib/cjkSelection";
 
 function spellcheckExt(on: boolean) {
   return EditorView.contentAttributes.of({
@@ -69,6 +70,7 @@ export function Editor() {
           search(),
           rectangularSelection(),
           crosshairCursor(),
+          cjkWordSelection,
           EditorView.updateListener.of((u) => {
             if (u.docChanged && !loadingRef.current) {
               const id = useStore.getState().activeTabId;
