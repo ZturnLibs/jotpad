@@ -113,7 +113,7 @@
 
 - [ ] 默认关联 `.txt` / 「打开方式」体验打磨（现有 shell 集成加固）
 - [x] 系统托盘 + 全局唤起快捷键（左键切换显隐、右键菜单、`Cmd/Ctrl+Shift+J` 唤起）
-- [ ] 便携版 / 静默安装说明（企业场景）
+- [x] 便携版 / 静默安装说明（`jotpad.portable` 标记开启便携模式，数据写程序同级 `data/`；README 含静默安装参数）
 - [x] 各平台安装包与更新通道（GitHub Releases + `plugin-updater`）
 
 ---

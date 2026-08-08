@@ -64,11 +64,7 @@ struct ProgressPayload {
 }
 
 fn voice_root(app: &AppHandle) -> Result<PathBuf, String> {
-    let dir = app
-        .path()
-        .app_data_dir()
-        .map_err(|e| e.to_string())?
-        .join("voice");
+    let dir = crate::data_dir(app)?.join("voice");
     fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     Ok(dir)
 }

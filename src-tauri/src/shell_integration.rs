@@ -40,11 +40,7 @@ fn platform_name() -> &'static str {
 }
 
 fn marker_path(app: &AppHandle, name: &str) -> Result<PathBuf, String> {
-    let dir = app
-        .path()
-        .app_data_dir()
-        .map_err(|e| e.to_string())?
-        .join(MARKER_DIR);
+    let dir = crate::data_dir(app)?.join(MARKER_DIR);
     fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     Ok(dir.join(name))
 }

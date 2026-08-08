@@ -196,13 +196,26 @@ fn write_file(
     Ok(())
 }
 
-fn state_path(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
-    let dir = app
-        .path()
-        .app_data_dir()
-        .map_err(|e| e.to_string())?;
+/// Resolve the app data directory. In portable mode (a `jotpad.portable`
+/// marker file next to the executable), all data lives in `<exe_dir>/data`.
+pub fn data_dir(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
+    if let Ok(exe) = std::env::current_exe() {
+        if exe.with_file_name("jotpad.portable").exists() {
+            let dir = exe
+                .parent()
+                .unwrap_or(std::path::Path::new("."))
+                .join("data");
+            fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+            return Ok(dir);
+        }
+    }
+    let dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
     fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
-    Ok(dir.join("jotpad-state.json"))
+    Ok(dir)
+}
+
+fn state_path(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
+    Ok(data_dir(app)?.join("jotpad-state.json"))
 }
 
 #[tauri::command]

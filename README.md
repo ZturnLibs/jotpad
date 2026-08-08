@@ -131,3 +131,24 @@ src-tauri/src/           # 多编码读写、重命名、mtime、菜单、状态
 - Windows: `%APPDATA%\com.jotpad.app\jotpad-state.json`
 
 未保存修改在退出前会提示；异常退出后下次启动可恢复草稿。
+
+## 便携版与企业部署
+
+### 便携版（Portable）
+
+在可执行文件（或 `.app/Contents/MacOS/` 内的可执行文件）同级目录创建一个名为 `jotpad.portable` 的空文件，即可启用便携模式：所有数据（草稿/设置、语音、历史、日志、shell 集成标记）都会写入程序同级的 `data/` 目录，不再写入系统应用数据目录——适合 U 盘携带或只读环境运行。
+
+```bash
+# 示例（Windows）
+Jotpad.exe 所在目录下新建空文件：jotpad.portable
+# 之后运行 Jotpad.exe，数据将存于同目录的 data\
+```
+
+### 静默安装 / 企业部署
+
+- **Windows MSI**：`msiexec /i Jotpad_<版本>_x64_zh-CN.msi /qn /norestart`
+- **Windows NSIS（setup.exe）**：`Jotpad_<版本>_x64-setup.exe /S`（`/S` 为 NSIS 静默参数）
+- **macOS**：`.pkg`/`.dmg` 可经 MDM（如 Jamf）分发；`sudo installer -pkg Jotpad.pkg -target /`
+- **Linux**：`sudo dpkg -i Jotpad_<版本>_amd64.deb` 或直接运行 AppImage
+
+便携模式下上述“静默安装”通常无需——解压即用、数据随身。

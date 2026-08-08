@@ -51,11 +51,7 @@ fn now_ms() -> u64 {
 }
 
 fn history_root(app: &AppHandle) -> Result<PathBuf, String> {
-    let dir = app
-        .path()
-        .app_data_dir()
-        .map_err(|e| e.to_string())?
-        .join("history");
+    let dir = crate::data_dir(app)?.join("history");
     fs::create_dir_all(dir.join("blobs")).map_err(|e| e.to_string())?;
     fs::create_dir_all(dir.join("files")).map_err(|e| e.to_string())?;
     Ok(dir)

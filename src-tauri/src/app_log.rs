@@ -31,11 +31,7 @@ impl Level {
 
 /// 在 setup 中调用一次，之后各模块可写日志。
 pub fn init(app: &AppHandle) -> Result<(), String> {
-    let dir = app
-        .path()
-        .app_data_dir()
-        .map_err(|e| e.to_string())?
-        .join("logs");
+    let dir = crate::data_dir(app)?.join("logs");
     fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     let path = dir.join("jotpad.log");
     rotate_if_needed(&path)?;
