@@ -103,6 +103,9 @@ const zhCN: Dict = {
   "view.encoding": "编码",
   "view.lineEnding": "行尾",
   "view.readOnly": "只读",
+  "view.diffDisk": "与磁盘版本对比…",
+  "diff.title": "与磁盘版本对比",
+  "diff.noChanges": "当前内容与磁盘版本一致。",
 
   // Window menu
   "window.nextTab": "下一个标签页",
@@ -373,6 +376,9 @@ const en: Dict = {
   "view.encoding": "Encoding",
   "view.lineEnding": "Line Ending",
   "view.readOnly": "Read-only",
+  "view.diffDisk": "Compare with Disk…",
+  "diff.title": "Compare with Disk",
+  "diff.noChanges": "The buffer matches the version on disk.",
 
   "window.nextTab": "Next Tab",
   "window.prevTab": "Previous Tab",

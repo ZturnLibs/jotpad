@@ -18,6 +18,7 @@ import { StatusBar } from "@/components/StatusBar";
 import { Settings } from "@/components/Settings";
 import { ContextMenu } from "@/components/ContextMenu";
 import { PageSetup } from "@/components/PageSetup";
+import { DiffDialog } from "@/components/DiffDialog";
 import { QuickOpen } from "@/components/QuickOpen";
 import { About, ConfirmDialog, GotoDialog, ReloadDialog, SessionNameDialog } from "@/components/Dialogs";
 import { HistoryPanel } from "@/components/HistoryPanel";
@@ -334,6 +335,7 @@ export function App() {
       <GotoDialog />
       <VoiceSetupDialog />
       <PageSetup />
+      <DiffDialog />
       <About />
       <HistoryPanel />
       <ToastHost />

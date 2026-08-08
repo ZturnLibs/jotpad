@@ -16,6 +16,7 @@ import { DEFAULT_SETTINGS } from "@/types";
 import * as api from "@/lib/backend";
 import { basename, dirname, joinPath } from "@/lib/backend";
 import { getEditorView } from "@/lib/editorRef";
+import { diffLines } from "@/lib/diff";
 import { translate } from "@/lib/i18n";
 import { dismissToast, showToast, updateToast } from "@/lib/toast";
 import {
@@ -93,6 +94,8 @@ interface Store {
   settingsOpen: boolean;
   aboutOpen: boolean;
   pageSetupOpen: boolean;
+  diffOpen: boolean;
+  diffData: { name: string; lines: import("@/lib/diff").DiffLine[]; same: boolean } | null;
   sessionNameOpen: boolean;
   historyOpen: boolean;
   menuOpen: MenuKind;
@@ -161,6 +164,8 @@ interface Store {
   setSettingsOpen: (v: boolean) => void;
   setAboutOpen: (v: boolean) => void;
   setPageSetupOpen: (v: boolean) => void;
+  setDiffOpen: (v: boolean) => void;
+  openDiff: () => Promise<void>;
   setSessionNameOpen: (v: boolean) => void;
   setHistoryOpen: (v: boolean) => void;
   setMenuOpen: (m: MenuKind) => void;
@@ -321,6 +326,8 @@ export const useStore = create<Store>((set, get) => ({
   settingsOpen: false,
   aboutOpen: false,
   pageSetupOpen: false,
+  diffOpen: false,
+  diffData: null,
   sessionNameOpen: false,
   historyOpen: false,
   menuOpen: null,
@@ -918,6 +925,25 @@ export const useStore = create<Store>((set, get) => ({
   },
   setAboutOpen: (v) => set({ aboutOpen: v }),
   setPageSetupOpen: (v) => set({ pageSetupOpen: v }),
+  setDiffOpen: (v) => set({ diffOpen: v }),
+
+  openDiff: async () => {
+    const tab = get().activeTab();
+    if (!tab?.filePath) {
+      await api.nativeMessage("Jotpad", get().settings.locale === "zh-CN" ? "该文件尚未保存到磁盘，无法与磁盘版本对比。" : "This file is not saved to disk; nothing to compare.");
+      return;
+    }
+    try {
+      const r = await api.readFile(tab.filePath);
+      const result = diffLines(tab.content, r.text);
+      set({
+        diffOpen: true,
+        diffData: { name: basename(tab.filePath), lines: result.lines, same: result.same },
+      });
+    } catch (e) {
+      await api.nativeMessage("Jotpad", String(e));
+    }
+  },
   setSessionNameOpen: (v) => set({ sessionNameOpen: v }),
   setHistoryOpen: (v) => set({ historyOpen: v }),
   setMenuOpen: (m) => set({ menuOpen: m }),

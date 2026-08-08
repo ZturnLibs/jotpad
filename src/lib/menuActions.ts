@@ -242,6 +242,11 @@ export function getMenuModel(): MenuModel {
       checked: activeTab?.readOnly ?? false,
     },
     {
+      id: "diffDisk",
+      label: t("view.diffDisk"),
+      disabled: !activeTab?.filePath,
+    },
+    {
       id: "theme",
       label: t("view.theme"),
       submenu: (["light", "dark", "system"] as ThemeMode[]).map((m) => ({
@@ -444,6 +449,9 @@ export function runMenuAction(id: string): void {
       break;
     case "readOnly":
       s.toggleReadOnly();
+      break;
+    case "diffDisk":
+      void s.openDiff();
       break;
     case "settings":
       s.setSettingsOpen(true);
