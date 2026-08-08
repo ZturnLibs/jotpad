@@ -7,7 +7,7 @@ use serde::Serialize;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::{AppHandle, Emitter};
 
 const BUNDLE_ID: &str = "com.jotpad.app";
 const NEW_SERVICE_NAME: &str = "Jotpad 新建文本文件.workflow";

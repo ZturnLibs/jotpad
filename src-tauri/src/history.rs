@@ -6,7 +6,7 @@ use sha2::{Digest, Sha256};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
-use tauri::{AppHandle, Manager};
+use tauri::AppHandle;
 
 const DEFAULT_MAX_ENTRIES: usize = 50;
 const DEFAULT_MAX_BYTES: u64 = 2 * 1024 * 1024;
