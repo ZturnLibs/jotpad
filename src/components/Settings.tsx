@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { useStore } from "@/store/useStore";
+import { showToast } from "@/lib/toast";
 import { useT } from "@/lib/i18n";
 import { ACCENT_PRESETS, FONT_PRESETS, type Locale, type StartupMode, type ThemeMode } from "@/types";
 import { clamp } from "@/lib/utils";
@@ -211,6 +212,12 @@ export function Settings() {
     try {
       await api.setShellNewTextFile(v);
       setShellNew(v);
+      showToast({
+        id: "shell-new",
+        title: t(v ? "settings.shellNewOn" : "settings.shellNewOff"),
+        variant: "success",
+        durationMs: 3000,
+      });
     } catch (e) {
       const msg = typeof e === "string" ? e : e instanceof Error ? e.message : String(e ?? "");
       setShellError(msg || t("settings.shellError"));
@@ -225,6 +232,12 @@ export function Settings() {
     try {
       await api.setShellOpenWith(v);
       setShellOpen(v);
+      showToast({
+        id: "shell-open",
+        title: t(v ? "settings.shellOpenOn" : "settings.shellOpenOff"),
+        variant: "success",
+        durationMs: 3000,
+      });
     } catch (e) {
       const msg = typeof e === "string" ? e : e instanceof Error ? e.message : String(e ?? "");
       setShellError(msg || t("settings.shellError"));
