@@ -1,12 +1,14 @@
 import { useEffect, useRef, type CSSProperties } from "react";
 import { Compartment, EditorState } from "@codemirror/state";
 import {
+  crosshairCursor,
   drawSelection,
   EditorView,
   highlightActiveLine,
   highlightActiveLineGutter,
   keymap,
   lineNumbers,
+  rectangularSelection,
 } from "@codemirror/view";
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { findNext, findPrevious, search, selectSelectionMatches } from "@codemirror/search";
@@ -65,6 +67,8 @@ export function Editor() {
           ]),
           highlightActiveLine(),
           search(),
+          rectangularSelection(),
+          crosshairCursor(),
           EditorView.updateListener.of((u) => {
             if (u.docChanged && !loadingRef.current) {
               const id = useStore.getState().activeTabId;
