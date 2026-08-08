@@ -241,7 +241,8 @@ export function TabBar() {
                 "tab" +
                 (active ? " active" : "") +
                 (editing ? " editing" : "") +
-                (tab.dirty ? " dirty" : "")
+                (tab.dirty ? " dirty" : "") +
+                (tab.readOnly ? " readonly" : "")
               }
               onClick={() => {
                 if (editing) return;
@@ -312,7 +313,19 @@ export function TabBar() {
                   aria-label={t("tab.rename")}
                 />
               ) : (
-                <span className="tab-title">{title}</span>
+                <>
+                  {tab.readOnly && (
+                    <span
+                      className="tab-lock"
+                      title={t("view.readOnly")}
+                      role="img"
+                      aria-label={t("view.readOnly")}
+                    >
+                      <Icon name="lock" size={13} />
+                    </span>
+                  )}
+                  <span className="tab-title">{title}</span>
+                </>
               )}
               <span className="tab-trailing">
                 {tab.dirty && (

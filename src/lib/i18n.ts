@@ -116,6 +116,7 @@ const zhCN: Dict = {
   "toolbar.font": "字体",
   "toolbar.fontSize": "字号",
   "toolbar.wordWrap": "自动换行",
+  "toolbar.readOnly": "只读模式",
   "toolbar.zoomOut": "缩小",
   "toolbar.zoomIn": "放大",
   "toolbar.theme": "主题",
@@ -195,6 +196,7 @@ const zhCN: Dict = {
   "status.zoom": "缩放",
   "status.encoding": "编码",
   "status.readOnly": "只读",
+  "status.editable": "可编辑",
   "status.pin": "置顶",
   "status.pinned": "已置顶",
 
@@ -391,6 +393,7 @@ const en: Dict = {
   "toolbar.font": "Font",
   "toolbar.fontSize": "Font Size",
   "toolbar.wordWrap": "Word Wrap",
+  "toolbar.readOnly": "Read-only mode",
   "toolbar.zoomOut": "Zoom Out",
   "toolbar.zoomIn": "Zoom In",
   "toolbar.theme": "Theme",
@@ -465,6 +468,7 @@ const en: Dict = {
   "status.zoom": "Zoom",
   "status.encoding": "Encoding",
   "status.readOnly": "Read-only",
+  "status.editable": "Editable",
   "status.pin": "Pin",
   "status.pinned": "Pinned",
 

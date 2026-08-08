@@ -13,6 +13,8 @@ export function Toolbar() {
   const t = useT();
   const settings = useStore((s) => s.settings);
   const setSettings = useStore((s) => s.setSettings);
+  const activeTab = useStore((s) => s.tabs.find((t) => t.id === s.activeTabId));
+  const toggleReadOnly = useStore((s) => s.toggleReadOnly);
 
   const themeCycle: ThemeMode[] = ["light", "dark", "system"];
   const themeIcon = settings.theme === "light" ? "sun" : settings.theme === "dark" ? "moon" : "monitor";
@@ -70,6 +72,16 @@ export function Toolbar() {
             aria-pressed={settings.wordWrap}
           >
             <Icon name="wrap" size={18} />
+          </button>
+          <button
+            className={"tb-btn" + (activeTab?.readOnly ? " active" : "")}
+            onClick={() => toggleReadOnly()}
+            title={t("toolbar.readOnly")}
+            aria-label={t("toolbar.readOnly")}
+            aria-pressed={!!activeTab?.readOnly}
+            disabled={!activeTab}
+          >
+            <Icon name="lock" size={16} />
           </button>
         </div>
 

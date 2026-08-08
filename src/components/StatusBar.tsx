@@ -3,6 +3,7 @@ import { useStore } from "@/store/useStore";
 import { useT } from "@/lib/i18n";
 import { subscribeEditor, type EditorInfo } from "@/lib/editorRef";
 import { ENCODINGS, LINE_ENDINGS } from "@/types";
+import { Icon } from "./icons";
 
 const initial: EditorInfo = {
   line: 1,
@@ -72,13 +73,14 @@ export function StatusBar() {
       >
         {alwaysOnTop ? t("status.pinned") : t("status.pin")}
       </span>
-      {activeTab?.readOnly ? (
+      {activeTab ? (
         <span
-          className="sb-item sb-click sb-on"
+          className={"sb-item sb-click" + (activeTab.readOnly ? " sb-on" : "")}
           onClick={() => toggleReadOnly()}
           title={t("view.readOnly")}
         >
-          {t("status.readOnly")}
+          <Icon name="lock" size={12} />
+          {activeTab.readOnly ? t("status.readOnly") : t("status.editable")}
         </span>
       ) : null}
       <span

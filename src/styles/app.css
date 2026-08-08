@@ -192,6 +192,18 @@ textarea {
   font-size: 13px;
   text-align: left;
 }
+/* 只读标记：标题前的锁图标 */
+.tab-lock {
+  display: grid;
+  place-items: center;
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  color: var(--text-secondary);
+}
+.tab.active .tab-lock {
+  color: var(--accent);
+}
 .tab.editing {
   cursor: text;
 }
@@ -426,6 +438,11 @@ textarea {
 .tb-btn.active {
   background: var(--bg-active);
   color: var(--accent);
+}
+.tb-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+  pointer-events: none;
 }
 .tb-select {
   height: 30px;
