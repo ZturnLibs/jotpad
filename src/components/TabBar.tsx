@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useStore } from "@/store/useStore";
 import { useT } from "@/lib/i18n";
 import { basename, clipboardWriteText, nativeMessage, revealInFolder } from "@/lib/backend";
@@ -12,10 +12,11 @@ interface CtxMenu {
   y: number;
 }
 
-type CtxAction = "copyPath" | "rename" | "reveal" | "delete" | "close" | "closeOthers";
+type CtxAction = "copyPath" | "rename" | "reveal" | "delete" | "pin" | "close" | "closeOthers";
 
 export function TabBar() {
   const tabs = useStore((s) => s.tabs);
+  const pinnedPaths = useStore((s) => s.pinnedPaths);
   const activeTabId = useStore((s) => s.activeTabId);
   const setActiveTab = useStore((s) => s.setActiveTab);
   const newTab = useStore((s) => s.newTab);
@@ -174,6 +175,10 @@ export function TabBar() {
         await deleteTabFile(tabId);
         break;
       }
+      case "pin": {
+        if (tab.filePath) useStore.getState().togglePinned(tab.filePath);
+        break;
+      }
       case "close": {
         if (editingId === tabId) cancelRename();
         requestClose(tabId);
@@ -204,9 +209,16 @@ export function TabBar() {
   const canCloseOthers = tabs.length > 1;
 
   const filterNorm = filter.trim().toLowerCase();
-  const visibleTabs = filterNorm
-    ? tabs.filter((tab) => tabLabel(tab).toLowerCase().includes(filterNorm))
-    : tabs;
+  const pinnedSet = useMemo(() => new Set(pinnedPaths), [pinnedPaths]);
+  const visibleTabs = (
+    filterNorm
+      ? tabs.filter((tab) => tabLabel(tab).toLowerCase().includes(filterNorm))
+      : [...tabs]
+  ).sort((a, b) => {
+    const pa = a.filePath ? (pinnedSet.has(a.filePath) ? 0 : 1) : 1;
+    const pb = b.filePath ? (pinnedSet.has(b.filePath) ? 0 : 1) : 1;
+    return pa - pb; // 稳定排序：不改变同组内原有顺序
+  });
   const showFilter = tabs.length >= 2;
 
   return (
@@ -242,7 +254,8 @@ export function TabBar() {
                 (active ? " active" : "") +
                 (editing ? " editing" : "") +
                 (tab.dirty ? " dirty" : "") +
-                (tab.readOnly ? " readonly" : "")
+                (tab.readOnly ? " readonly" : "") +
+                (tab.filePath && pinnedSet.has(tab.filePath) ? " pinned" : "")
               }
               onClick={() => {
                 if (editing) return;
@@ -314,6 +327,11 @@ export function TabBar() {
                 />
               ) : (
                 <>
+                  {tab.filePath && pinnedSet.has(tab.filePath) && (
+                    <span className="tab-pin" title={t("tab.pinned")} role="img" aria-label={t("tab.pinned")}>
+                      <Icon name="pin" size={12} />
+                    </span>
+                  )}
                   {tab.readOnly && (
                     <span
                       className="tab-lock"
@@ -403,6 +421,15 @@ export function TabBar() {
           >
             <span className="check" />
             <span className="label">{t("tab.deleteFile")}</span>
+          </div>
+          <div className="menu-sep" />
+          <div
+            className={"menu-row" + (hasFile ? "" : " disabled")}
+            role="menuitem"
+            onClick={() => hasFile && void runCtxAction("pin")}
+          >
+            <span className="check" />
+            <span className="label">{ctxTab?.filePath && pinnedSet.has(ctxTab.filePath) ? t("tab.unpin") : t("tab.pin")}</span>
           </div>
           <div className="menu-sep" />
           <div className="menu-row" role="menuitem" onClick={() => void runCtxAction("close")}>

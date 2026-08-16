@@ -84,6 +84,7 @@ interface Store {
   activeTabId: string | null;
   settings: AppSettings;
   recentFiles: string[];
+  pinnedPaths: string[];
   sessions: NamedSession[];
 
   // Transient UI flags
@@ -139,6 +140,7 @@ interface Store {
   renameTab: (id: string, newName: string) => Promise<boolean>;
   /** Permanently delete the on-disk file and close the tab. */
   deleteTabFile: (id: string) => Promise<boolean>;
+  togglePinned: (path: string) => void;
   clearRecent: () => void;
   /** Prompt UI then save current on-disk tabs as a named session. */
   requestSaveSession: () => void;
@@ -321,6 +323,7 @@ export const useStore = create<Store>((set, get) => ({
   activeTabId: null,
   settings: DEFAULT_SETTINGS,
   recentFiles: [],
+  pinnedPaths: [],
   sessions: [],
 
   findOpen: false,
@@ -359,6 +362,9 @@ export const useStore = create<Store>((set, get) => ({
     }
     const settings = normalizeSettings({ ...(state?.settings || {}) });
     const recentFiles = Array.isArray(state?.recentFiles) ? state!.recentFiles : [];
+    const pinnedPaths = Array.isArray(state?.pinnedPaths)
+      ? [...new Set(state!.pinnedPaths.filter((p) => typeof p === "string" && p))]
+      : [];
     const sessions = normalizeSessions(state?.sessions);
 
     const restoreTabs =
@@ -398,6 +404,7 @@ export const useStore = create<Store>((set, get) => ({
         activeTabId: t.id,
         settings: state ? settings : DEFAULT_SETTINGS,
         recentFiles,
+        pinnedPaths,
         sessions,
         ready: true,
       });
@@ -406,7 +413,7 @@ export const useStore = create<Store>((set, get) => ({
   },
 
   persist: async () => {
-    const { tabs, activeTabId, settings, recentFiles, sessions, ready } = get();
+    const { tabs, activeTabId, settings, recentFiles, sessions, pinnedPaths, ready } = get();
     if (!ready) return;
     const state: AppState = {
       version: STATE_VERSION,
@@ -415,6 +422,7 @@ export const useStore = create<Store>((set, get) => ({
       settings,
       recentFiles,
       sessions,
+      pinnedPaths,
     };
     try {
       await api.writeState(state);
@@ -703,6 +711,14 @@ export const useStore = create<Store>((set, get) => ({
   },
 
   clearRecent: () => set({ recentFiles: [] }),
+
+  togglePinned: (path) => {
+    set((s) => ({
+      pinnedPaths: s.pinnedPaths.includes(path)
+        ? s.pinnedPaths.filter((p) => p !== path)
+        : [...s.pinnedPaths, path],
+    }));
+  },
 
   requestSaveSession: () => {
     const paths = get()

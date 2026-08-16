@@ -98,6 +98,8 @@ export interface AppState {
   settings: AppSettings;
   recentFiles: string[];
   sessions: NamedSession[];
+  /** Pinned file paths (favorite tabs shown at the top of the sidebar). */
+  pinnedPaths: string[];
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
