@@ -56,6 +56,7 @@ const zhCN: Dict = {
   "edit.findPrev": "查找上一个",
   "edit.replace": "替换…",
   "edit.crossSearch": "在文件中查找…",
+  "edit.outline": "文档大纲…",
   "edit.goto": "转到…",
   "edit.selectAll": "全选",
   "edit.timeDate": "时间/日期",
@@ -164,6 +165,11 @@ const zhCN: Dict = {
   "crossSearch.regexp": "正则",
   "crossSearch.wholeWord": "整词",
   "crossSearch.results": "{n} 个结果 · {m} 个文件",
+
+  // Outline
+  "outline.title": "文档大纲",
+  "outline.placeholder": "筛选标题…",
+  "outline.noHeadings": "无标题——用 # 开始一行试试",
 
   // Goto
   "goto.title": "转到行",
@@ -349,6 +355,7 @@ const en: Dict = {
   "edit.findPrev": "Find Previous",
   "edit.replace": "Replace…",
   "edit.crossSearch": "Find in Files…",
+  "edit.outline": "Document Outline…",
   "edit.goto": "Go To…",
   "edit.selectAll": "Select All",
   "edit.timeDate": "Time/Date",
@@ -451,6 +458,11 @@ const en: Dict = {
   "crossSearch.regexp": "Regex",
   "crossSearch.wholeWord": "Whole word",
   "crossSearch.results": "{n} results · {m} files",
+
+  // Outline
+  "outline.title": "Document Outline",
+  "outline.placeholder": "Filter headings…",
+  "outline.noHeadings": "No headings — start a line with # to add one",
 
   "goto.title": "Go to Line",
   "goto.line": "Line number",

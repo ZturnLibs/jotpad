@@ -21,6 +21,7 @@ import { PageSetup } from "@/components/PageSetup";
 import { DiffDialog } from "@/components/DiffDialog";
 import { QuickOpen } from "@/components/QuickOpen";
 import { CrossSearch } from "@/components/CrossSearch";
+import { Outline } from "@/components/Outline";
 import { About, ConfirmDialog, GotoDialog, ReloadDialog, SessionNameDialog } from "@/components/Dialogs";
 import { HistoryPanel } from "@/components/HistoryPanel";
 import { ToastHost } from "@/components/ToastHost";
@@ -172,6 +173,8 @@ export function App() {
             s.voiceOpen ||
             s.voiceSetupOpen ||
             s.quickOpenOpen ||
+            s.crossSearchOpen ||
+            s.outlineOpen ||
             s.findOpen ||
             s.gotoOpen ||
             s.settingsOpen ||
@@ -190,6 +193,12 @@ export function App() {
           getEditorView()?.focus();
         } else if (s.quickOpenOpen) {
           s.setQuickOpenOpen(false);
+          getEditorView()?.focus();
+        } else if (s.crossSearchOpen) {
+          s.setCrossSearchOpen(false);
+          getEditorView()?.focus();
+        } else if (s.outlineOpen) {
+          s.setOutlineOpen(false);
           getEditorView()?.focus();
         } else if (s.findOpen) {
           s.setFindOpen(false);
@@ -342,6 +351,7 @@ export function App() {
       <ContextMenu />
       <QuickOpen />
       <CrossSearch />
+      <Outline />
       <ConfirmDialog />
       <SessionNameDialog />
       <ReloadDialog />

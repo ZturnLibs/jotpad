@@ -139,6 +139,12 @@ export const SHORTCUTS: readonly ShortcutDef[] = [
     accel: A("Shift+F"),
   },
   {
+    id: "outline",
+    chords: [{ key: "o", mod: true, shift: true }],
+    label: `${MOD}+Shift+O`,
+    accel: A("Shift+O"),
+  },
+  {
     id: "closeTab",
     chords: [{ key: "w", mod: true }],
     label: `${MOD}+W`,

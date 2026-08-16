@@ -92,6 +92,7 @@ interface Store {
   gotoOpen: boolean;
   quickOpenOpen: boolean;
   crossSearchOpen: boolean;
+  outlineOpen: boolean;
   settingsOpen: boolean;
   aboutOpen: boolean;
   pageSetupOpen: boolean;
@@ -163,6 +164,7 @@ interface Store {
   setGotoOpen: (v: boolean) => void;
   setQuickOpenOpen: (v: boolean) => void;
   setCrossSearchOpen: (v: boolean) => void;
+  setOutlineOpen: (v: boolean) => void;
   setSettingsOpen: (v: boolean) => void;
   setAboutOpen: (v: boolean) => void;
   setPageSetupOpen: (v: boolean) => void;
@@ -326,6 +328,7 @@ export const useStore = create<Store>((set, get) => ({
   gotoOpen: false,
   quickOpenOpen: false,
   crossSearchOpen: false,
+  outlineOpen: false,
   settingsOpen: false,
   aboutOpen: false,
   pageSetupOpen: false,
@@ -922,6 +925,7 @@ export const useStore = create<Store>((set, get) => ({
   setGotoOpen: (v) => set({ gotoOpen: v }),
   setQuickOpenOpen: (v) => set({ quickOpenOpen: v }),
   setCrossSearchOpen: (v) => set({ crossSearchOpen: v }),
+  setOutlineOpen: (v) => set({ outlineOpen: v }),
   setSettingsOpen: (v) => {
     set({ settingsOpen: v });
     // 离开设置页时落盘，避免仅改设置未触发其他 persist 时丢失

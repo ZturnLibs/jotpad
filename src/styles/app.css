@@ -966,6 +966,25 @@ textarea {
   border-radius: 2px;
   padding: 0 1px;
 }
+
+/* ---------- Outline ---------- */
+.outline-panel {
+  width: min(520px, calc(100vw - 32px));
+}
+.outline-row {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+.outline-badge {
+  font-size: 10px;
+  color: var(--text-secondary);
+  background: var(--bg-hover);
+  border-radius: 4px;
+  padding: 1px 5px;
+  white-space: nowrap;
+}
+.quick-open-row.active .outline-badge {
+  color: var(--accent);
+}
 .dialog {
   background: var(--bg-elevated);
   border: 1px solid var(--border);
