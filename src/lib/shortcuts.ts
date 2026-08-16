@@ -134,9 +134,9 @@ export const SHORTCUTS: readonly ShortcutDef[] = [
   },
   {
     id: "crossSearch",
-    chords: [{ key: "f", mod: true, shift: true }],
-    label: `${MOD}+Shift+F`,
-    accel: A("Shift+F"),
+    chords: [{ key: "h", mod: true, shift: true }],
+    label: `${MOD}+Shift+H`,
+    accel: A("Shift+H"),
   },
   {
     id: "outline",

@@ -54,6 +54,7 @@ export function searchText(text: string, re: RegExp, cap = MAX_LINES_PER_FILE): 
   re.lastIndex = 0;
   let lineStart = 0;
   let line = 1;
+  let lastHitLine = 0; // 同一行只展示首条命中（预览去重，对齐 VS Code 行为）
   let m: RegExpExecArray | null;
   while ((m = re.exec(text)) !== null) {
     if (m[0].length === 0) {
@@ -69,6 +70,8 @@ export function searchText(text: string, re: RegExp, cap = MAX_LINES_PER_FILE): 
       line++;
       lineStart = nl + 1;
     }
+    if (line === lastHitLine) continue; // 同行后续命中跳过（预览不重复）
+    lastHitLine = line;
     let lineEnd = text.indexOf("\n", from);
     if (lineEnd === -1) lineEnd = text.length;
     hits.push({

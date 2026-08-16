@@ -17,7 +17,7 @@ Jotpad 虽无显式 workspace，但**每个系统都有默认保存目录**：
 → **这个目录就是用户的笔记根**。本设计把它作为主搜索范围，驱动三个能力（用户原话）：
 
 1. **快速打开**（QuickOpen 增强）：按文件名在该目录里模糊查找，`Cmd/Ctrl+P` 能找到"从没打开过"的文件。
-2. **跨文件搜索**（CrossSearch 新增）：按内容在该目录里全文检索，`Cmd/Ctrl+Shift+F`。
+2. **跨文件搜索**（CrossSearch 新增）：按内容在该目录里全文检索，`Cmd/Ctrl+Shift+H`。
 
 合并后的**搜索源**（优先级降序）：
 
@@ -224,7 +224,7 @@ const pick = async (file: FileHit, line: LineHit) => {
 ## 七、store / 快捷键 / 菜单 / i18n
 
 - **store**：仿 `quickOpenOpen` 加 `crossSearchOpen` / `setCrossSearchOpen`。
-- **快捷键**：`crossSearch` = `Cmd/Ctrl+Shift+F`（业界"在文件中查找"约定），加入 `shortcuts.ts`。
+- **快捷键**：`crossSearch` = `Cmd/Ctrl+Shift+H`（原定 Cmd/Ctrl+Shift+F，实测在 macOS 被 WKWebView 之前的系统层吞掉，遂改 H），加入 `shortcuts.ts`。
 - **菜单**：「编辑」下 Find 系列加「在文件中查找…」→ `setCrossSearchOpen(true)`。
 - **i18n**：新增 `crossSearch.*`（title/placeholder/noResults/scanning/caseSensitive/regexp/wholeWord/results）+ QuickOpen 的「目录」badge。
 
@@ -271,7 +271,7 @@ const pick = async (file: FileHit, line: LineHit) => {
 1. **Rust**（手动 / `cargo test` 可选）：`list_dir_files` 递归、隐藏/噪声跳过、扩展名过滤、`max_files` 截断、mtime 排序。
 2. **单元**（`crossSearch.test.ts`）：多行命中偏移/行号/列、大小写/正则/整词、`MAX_LINES_PER_FILE` 封顶、`isBinary` NUL 检测。
 3. **手动**：
-   - `Cmd+Shift+F` → 输入词 → 实时分组结果（含保存目录文件）
+   - `Cmd+Shift+H` → 输入词 → 实时分组结果（含保存目录文件）
    - `↑/↓/Enter` 跳转到正确行列
    - `Cmd+P` 能找到保存目录里"从未打开"的文件
    - 三开关（大小写/正则/整词）生效

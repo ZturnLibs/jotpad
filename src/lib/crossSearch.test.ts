@@ -6,26 +6,25 @@ import {
 } from "@/lib/crossSearch";
 
 describe("searchText", () => {
-  it("单行多命中：行号/列/绝对偏移正确", () => {
+  it("单行多命中：同行只保留首条（预览去重），偏移正确", () => {
     const re = /foo/g;
     const hits = searchText("foo bar foo baz", re);
-    expect(hits).toHaveLength(2);
+    expect(hits).toHaveLength(1);
     expect(hits[0]).toMatchObject({ line: 1, col: 1, from: 0, to: 3 });
-    expect(hits[1]).toMatchObject({ line: 1, col: 9, from: 8, to: 11 });
   });
 
-  it("多行：行号随换行推进", () => {
-    // idx: 0:a 1:\n 2:b 3:c 4:(space) 5:f..7:o | 8:\n 9:f..11:o
-    const text = "a\nbc foo\nfoo";
+  it("多行：行号随换行推进，不同行各自保留", () => {
+    // "a\nbc foo foo\nfoo": 第二个 foo 在同行被去重；第三行 foo from=13
+    const text = "a\nbc foo foo\nfoo";
     const hits = searchText(text, /foo/g);
     expect(hits).toHaveLength(2);
     expect(hits[0]).toMatchObject({ line: 2, col: 4, from: 5, to: 8 });
-    expect(hits[1]).toMatchObject({ line: 3, col: 1, from: 9, to: 12 });
+    expect(hits[1]).toMatchObject({ line: 3, col: 1, from: 13, to: 16 });
   });
 
   it("大小写不敏感（由正则 flags 决定）", () => {
-    expect(searchText("Foo FOO foo", /foo/gi)).toHaveLength(3);
-    expect(searchText("Foo FOO foo", /foo/g)).toHaveLength(1);
+    expect(searchText("Foo FOO", /foo/gi)).toHaveLength(1); // 同行去重后 1 条
+    expect(searchText("Foo\nFOO", /foo/gi)).toHaveLength(2); // 不同行各 1 条
   });
 
   it("整词：buildSearchRegExp 包裹 \\b", () => {
