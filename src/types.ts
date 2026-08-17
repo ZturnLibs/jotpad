@@ -89,6 +89,8 @@ export interface AppSettings {
   localHistoryEnabled: boolean;
   /** 自定义默认保存目录；null 表示使用系统「文档」目录。 */
   defaultSaveDirectory: string | null;
+  /** 实验特性开关（默认全关；稳定后转正并默认开启）。key 约定见 docs/design-markdown-experimental.md。 */
+  experimental: Record<string, boolean>;
 }
 
 export interface AppState {
@@ -118,6 +120,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   skippedUpdateVersion: null,
   localHistoryEnabled: true,
   defaultSaveDirectory: null,
+  experimental: {},
 };
 
 /** Accent color presets shown in Settings. "system" follows the OS accent. */

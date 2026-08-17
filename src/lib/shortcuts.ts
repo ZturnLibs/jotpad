@@ -145,6 +145,12 @@ export const SHORTCUTS: readonly ShortcutDef[] = [
     accel: A("Shift+O"),
   },
   {
+    id: "markdownPreview",
+    chords: [{ key: "/", mod: true }],
+    label: `${MOD}+/`,
+    accel: A("/"),
+  },
+  {
     id: "closeTab",
     chords: [{ key: "w", mod: true }],
     label: `${MOD}+W`,

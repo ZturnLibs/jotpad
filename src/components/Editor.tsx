@@ -11,6 +11,7 @@ import {
   rectangularSelection,
 } from "@codemirror/view";
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
+import { markdown } from "@codemirror/lang-markdown";
 import { findNext, findPrevious, search, selectSelectionMatches } from "@codemirror/search";
 import { useStore } from "@/store/useStore";
 import { emitEditorInfo, setEditorView, viewInfo } from "@/lib/editorRef";
@@ -22,6 +23,15 @@ function spellcheckExt(on: boolean) {
   });
 }
 
+/** 实验特性 markdown：仅 .md/.markdown/.mdx 文件启用。 */
+function markdownEnabled(
+  settings: { experimental: Record<string, boolean> },
+  filePath: string | null,
+): boolean {
+  if (!settings.experimental?.markdown || !filePath) return false;
+  return /\.(md|markdown|mdx)$/i.test(filePath);
+}
+
 export function Editor() {
   const hostRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
@@ -29,6 +39,7 @@ export function Editor() {
   const guttersCompartment = useRef(new Compartment());
   const spellCompartment = useRef(new Compartment());
   const readOnlyCompartment = useRef(new Compartment());
+  const langCompartment = useRef(new Compartment());
   const loadingRef = useRef(false);
   const prevTabIdRef = useRef<string | null>(null);
 
@@ -52,6 +63,11 @@ export function Editor() {
           EditorState.allowMultipleSelections.of(true),
           readOnlyCompartment.current.of(
             store.activeTab()?.readOnly ? EditorState.readOnly.of(true) : [],
+          ),
+          langCompartment.current.of(
+            markdownEnabled(store.settings, store.activeTab()?.filePath ?? null)
+              ? markdown()
+              : [],
           ),
           wrapCompartment.current.of(
             store.settings.wordWrap ? EditorView.lineWrapping : [],
@@ -161,6 +177,14 @@ export function Editor() {
       ),
     });
   }, [tab?.readOnly]);
+
+  useEffect(() => {
+    viewRef.current?.dispatch({
+      effects: langCompartment.current.reconfigure(
+        markdownEnabled(settings, tab?.filePath ?? null) ? markdown() : [],
+      ),
+    });
+  }, [settings.experimental, tab?.filePath, settings]);
 
   const fontSize = settings.fontSize * (settings.zoom / 100);
 

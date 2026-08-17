@@ -419,6 +419,19 @@ export function Settings() {
                   />
                 </div>
               </SettingsSection>
+              <SettingsSection title={t("settings.experimental")}>
+                <div className="settings-toggles">
+                  <Toggle
+                    on={!!settings.experimental.markdown}
+                    onChange={(v) =>
+                      setSettings({ experimental: { ...settings.experimental, markdown: v } })
+                    }
+                    label={t("settings.exp.markdown")}
+                  />
+                </div>
+                <p className="settings-hint muted">{t("settings.exp.markdownDesc")}</p>
+                <p className="settings-hint muted">{t("settings.experimentalHint")}</p>
+              </SettingsSection>
               <SettingsSection title={t("settings.startup")}>
                 <Segmented<StartupMode>
                   value={settings.startupMode}

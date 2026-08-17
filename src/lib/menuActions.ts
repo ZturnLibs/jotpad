@@ -249,6 +249,12 @@ export function getMenuModel(): MenuModel {
       disabled: !activeTab?.filePath,
     },
     {
+      id: "markdownPreview",
+      label: t("view.markdownPreview"),
+      checked: s.previewOpen,
+      disabled: !s.settings.experimental?.markdown || !/\.(md|markdown|mdx)$/i.test(activeTab?.filePath ?? ""),
+    },
+    {
       id: "theme",
       label: t("view.theme"),
       submenu: (["light", "dark", "system"] as ThemeMode[]).map((m) => ({
@@ -460,6 +466,9 @@ export function runMenuAction(id: string): void {
       break;
     case "diffDisk":
       void s.openDiff();
+      break;
+    case "markdownPreview":
+      if (s.settings.experimental?.markdown) s.setPreviewOpen(!s.previewOpen);
       break;
     case "settings":
       s.setSettingsOpen(true);

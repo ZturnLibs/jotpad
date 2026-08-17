@@ -105,6 +105,7 @@ const zhCN: Dict = {
   "view.encoding": "编码",
   "view.lineEnding": "行尾",
   "view.readOnly": "只读",
+  "view.markdownPreview": "Markdown 预览",
   "view.diffDisk": "与磁盘版本对比…",
   "diff.title": "与磁盘版本对比",
   "diff.noChanges": "当前内容与磁盘版本一致。",
@@ -232,6 +233,12 @@ const zhCN: Dict = {
   "settings.behavior": "行为",
   "settings.showStatusBar": "显示状态栏",
   "settings.startup": "启动时",
+
+  // Experimental features
+  "settings.experimental": "实验特性",
+  "settings.experimentalHint": "实验特性默认关闭，可能不稳定；稳定后将正式开放。",
+  "settings.exp.markdown": "Markdown（语法高亮与预览）",
+  "settings.exp.markdownDesc": "为 .md 文件启用语法着色，并提供 Cmd/Ctrl+/ 分栏预览。文件仍为纯文本。",
   "settings.startupRestore": "恢复上次标签",
   "settings.startupBlank": "空白起步",
   "settings.startupHint": "「空白起步」仍会保留设置与最近文件/会话，但不会自动打开上次的标签内容。",
@@ -405,6 +412,7 @@ const en: Dict = {
   "view.encoding": "Encoding",
   "view.lineEnding": "Line Ending",
   "view.readOnly": "Read-only",
+  "view.markdownPreview": "Markdown Preview",
   "view.diffDisk": "Compare with Disk…",
   "diff.title": "Compare with Disk",
   "diff.noChanges": "The buffer matches the version on disk.",
@@ -524,6 +532,12 @@ const en: Dict = {
   "settings.behavior": "Behavior",
   "settings.showStatusBar": "Show status bar",
   "settings.startup": "On startup",
+
+  // Experimental features
+  "settings.experimental": "Experimental Features",
+  "settings.experimentalHint": "Experimental features are off by default and may be unstable; they graduate once stable.",
+  "settings.exp.markdown": "Markdown (highlight & preview)",
+  "settings.exp.markdownDesc": "Syntax coloring for .md files plus a Cmd/Ctrl+/ split preview. Files stay plain text.",
   "settings.startupRestore": "Restore last tabs",
   "settings.startupBlank": "Start blank",
   "settings.startupHint": "“Start blank” keeps settings, recent files, and sessions, but does not reopen last tabs.",

@@ -94,6 +94,7 @@ interface Store {
   quickOpenOpen: boolean;
   crossSearchOpen: boolean;
   outlineOpen: boolean;
+  previewOpen: boolean;
   settingsOpen: boolean;
   aboutOpen: boolean;
   pageSetupOpen: boolean;
@@ -167,6 +168,7 @@ interface Store {
   setQuickOpenOpen: (v: boolean) => void;
   setCrossSearchOpen: (v: boolean) => void;
   setOutlineOpen: (v: boolean) => void;
+  setPreviewOpen: (v: boolean) => void;
   setSettingsOpen: (v: boolean) => void;
   setAboutOpen: (v: boolean) => void;
   setPageSetupOpen: (v: boolean) => void;
@@ -233,6 +235,12 @@ function normalizeSettings(raw: Partial<AppSettings> & Record<string, unknown>):
     typeof merged.defaultSaveDirectory === "string" && merged.defaultSaveDirectory.trim()
       ? merged.defaultSaveDirectory
       : null;
+  const experimental: Record<string, boolean> = {};
+  if (merged.experimental && typeof merged.experimental === "object") {
+    for (const [k, v] of Object.entries(merged.experimental as Record<string, unknown>)) {
+      if (typeof k === "string" && k) experimental[k] = !!v;
+    }
+  }
   return {
     theme: merged.theme,
     locale: merged.locale,
@@ -249,6 +257,7 @@ function normalizeSettings(raw: Partial<AppSettings> & Record<string, unknown>):
     skippedUpdateVersion: skipped,
     localHistoryEnabled: merged.localHistoryEnabled !== false,
     defaultSaveDirectory,
+    experimental,
   };
 }
 
@@ -332,6 +341,7 @@ export const useStore = create<Store>((set, get) => ({
   quickOpenOpen: false,
   crossSearchOpen: false,
   outlineOpen: false,
+  previewOpen: false,
   settingsOpen: false,
   aboutOpen: false,
   pageSetupOpen: false,
@@ -942,6 +952,7 @@ export const useStore = create<Store>((set, get) => ({
   setQuickOpenOpen: (v) => set({ quickOpenOpen: v }),
   setCrossSearchOpen: (v) => set({ crossSearchOpen: v }),
   setOutlineOpen: (v) => set({ outlineOpen: v }),
+  setPreviewOpen: (v) => set({ previewOpen: v }),
   setSettingsOpen: (v) => {
     set({ settingsOpen: v });
     // 离开设置页时落盘，避免仅改设置未触发其他 persist 时丢失

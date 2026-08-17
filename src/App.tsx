@@ -22,6 +22,7 @@ import { DiffDialog } from "@/components/DiffDialog";
 import { QuickOpen } from "@/components/QuickOpen";
 import { CrossSearch } from "@/components/CrossSearch";
 import { Outline } from "@/components/Outline";
+import { MarkdownPreview } from "@/components/MarkdownPreview";
 import { About, ConfirmDialog, GotoDialog, ReloadDialog, SessionNameDialog } from "@/components/Dialogs";
 import { HistoryPanel } from "@/components/HistoryPanel";
 import { ToastHost } from "@/components/ToastHost";
@@ -339,8 +340,9 @@ export function App() {
           </aside>
           <main className="main">
             <Toolbar />
-            <div className="editor-wrap-host" style={{ flex: 1, position: "relative", minHeight: 0 }}>
+            <div className="editor-wrap-host" style={{ flex: 1, position: "relative", minHeight: 0, display: "flex" }}>
               <Editor />
+              <MarkdownPreview />
               <FindBar />
               <VoiceBar />
             </div>
