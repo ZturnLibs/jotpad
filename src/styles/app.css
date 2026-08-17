@@ -1067,6 +1067,30 @@ textarea {
 .md-preview-body img { max-width: 100%; }
 .md-preview-body a { color: var(--accent); }
 .md-preview-body hr { border: none; border-top: 1px solid var(--border); margin: 1em 0; }
+/* GFM 任务列表 */
+.md-preview-body input[type="checkbox"] {
+  margin-right: 0.45em;
+  accent-color: var(--accent);
+  vertical-align: middle;
+}
+.md-preview-body li:has(> input[type="checkbox"]) {
+  list-style: none;
+  margin-left: -1.2em;
+}
+/* 被安全策略剥除 href 的链接：保留文本但不可点击 */
+.md-preview-body a.md-link-blocked {
+  color: var(--text-secondary);
+  text-decoration: line-through;
+  cursor: not-allowed;
+}
+.md-preview-body img.md-img-blocked {
+  display: inline-block;
+  min-width: 1.4em;
+  border: 1px dashed var(--border-strong);
+  border-radius: 4px;
+  padding: 0 0.4em;
+  font-size: 0.85em;
+}
 .outline-row {
   grid-template-columns: auto minmax(0, 1fr) auto;
 }

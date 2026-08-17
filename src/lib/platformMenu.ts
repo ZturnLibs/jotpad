@@ -107,16 +107,35 @@ export async function applyNativeMenu(): Promise<void> {
 }
 
 let unlisten: UnlistenFn | undefined;
+let starting: Promise<void> | undefined;
 
 /** Debounced native menu rebuild — coalesces rapid state changes (e.g. tab switches). */
 export const applyNativeMenuDebounced = debounce(() => {
   void applyNativeMenu();
 }, 120);
 
-/** Subscribe to native menu clicks. */
+/**
+ * Subscribe to native menu clicks.
+ *
+ * 并发防护：App 启动期间 effect 可能连续多次调用（ready/settings 变化），
+ * 若两次 await listen 交叠会注册两个 listener → 同一菜单点击双发（toggle 回弹）。
+ * 用单一 starting promise 保证只 listen 一次。
+ */
 export async function startNativeMenuListener(): Promise<void> {
   if (unlisten) return;
-  unlisten = await listen<string>("menu://click", (e) => {
-    runMenuAction(e.payload);
-  });
+  if (!starting) {
+    starting = (async () => {
+      // macOS Check 菜单项在同毫秒内可能产生两次事件（select + toggle），
+      // 同 id 300ms 内去重，避免 toggle 类动作双发回弹。
+      let lastClick = { id: "", at: 0 };
+      const fn = await listen<string>("menu://click", (e) => {
+        const now = Date.now();
+        if (e.payload === lastClick.id && now - lastClick.at < 300) return;
+        lastClick = { id: e.payload, at: now };
+        runMenuAction(e.payload);
+      });
+      unlisten = fn;
+    })();
+  }
+  await starting;
 }
