@@ -41,6 +41,24 @@ export function Outline() {
     el?.scrollIntoView({ block: "nearest" });
   }, [index, filtered.length]);
 
+  // 打开时高亮当前光标所在的标题（跟随编辑器滚动位置）
+  useEffect(() => {
+    if (!open) return;
+    const view = getEditorView();
+    if (!view) return;
+    const pos = view.state.selection.main.head;
+    // 从后往前找第一个 from <= pos 的标题
+    let hit = -1;
+    for (let i = items.length - 1; i >= 0; i--) {
+      if (items[i]!.from <= pos) {
+        hit = i;
+        break;
+      }
+    }
+    if (hit >= 0 && !query.trim()) setIndex(hit);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, activeTabId, items]);
+
   if (!open) return null;
 
   const close = () => {

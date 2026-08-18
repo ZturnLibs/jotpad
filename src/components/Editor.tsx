@@ -13,6 +13,8 @@ import {
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { languages } from "@codemirror/language-data";
+import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
+import { tags as t } from "@lezer/highlight";
 import { findNext, findPrevious, search, selectSelectionMatches } from "@codemirror/search";
 import { useStore } from "@/store/useStore";
 import { emitEditorInfo, setEditorView, viewInfo } from "@/lib/editorRef";
@@ -40,6 +42,27 @@ function markdownLang(): ReturnType<typeof markdown> {
     codeLanguages: languages,
   });
 }
+
+/** Markdown 语法配色：跟随主题变量，标题加重、标记淡化、代码块/链接着色。 */
+const mdHighlight = HighlightStyle.define([
+  { tag: t.heading, fontWeight: "700", color: "var(--md-heading, var(--text))" },
+  { tag: t.heading1, fontSize: "1.35em" },
+  { tag: t.heading2, fontSize: "1.22em" },
+  { tag: t.heading3, fontSize: "1.1em" },
+  { tag: t.strong, fontWeight: "700" },
+  { tag: t.emphasis, fontStyle: "italic" },
+  { tag: t.strikethrough, textDecoration: "line-through" },
+  { tag: t.link, color: "var(--accent)", textDecoration: "underline" },
+  { tag: t.url, color: "var(--accent)", textDecoration: "underline" },
+  { tag: [t.monospace], color: "var(--md-code, var(--accent))" },
+  { tag: [t.quote], color: "var(--text-secondary)", fontStyle: "italic" },
+  { tag: t.list, color: "var(--accent)" },
+  { tag: [t.meta, t.processingInstruction], color: "var(--text-secondary)" },
+  { tag: t.contentSeparator, color: "var(--text-secondary)" },
+  { tag: [t.keyword, t.atom, t.bool, t.number], color: "var(--md-code, var(--accent))" },
+  { tag: t.string, color: "var(--md-str, #a66b2f)" },
+  { tag: t.comment, color: "var(--text-secondary)", fontStyle: "italic" },
+]);
 
 /** 光标选区包裹 Markdown 标记（粗体/斜体/行内代码）。返回 true 表示已处理。 */
 function wrapSelection(view: import("@codemirror/view").EditorView, mark: string): boolean {
@@ -93,7 +116,7 @@ export function Editor() {
           ),
           langCompartment.current.of(
             markdownEnabled(store.settings, store.activeTab()?.filePath ?? null)
-              ? markdownLang()
+              ? [markdownLang(), syntaxHighlighting(mdHighlight)]
               : [],
           ),
           wrapCompartment.current.of(
@@ -229,7 +252,9 @@ export function Editor() {
   useEffect(() => {
     viewRef.current?.dispatch({
       effects: langCompartment.current.reconfigure(
-        markdownEnabled(settings, tab?.filePath ?? null) ? markdownLang() : [],
+        markdownEnabled(settings, tab?.filePath ?? null)
+          ? [markdownLang(), syntaxHighlighting(mdHighlight)]
+          : [],
       ),
     });
   }, [settings.experimental, tab?.filePath, settings]);

@@ -984,6 +984,18 @@ textarea {
   width: min(520px, calc(100vw - 32px));
 }
 
+/* Markdown 预览（实验）变量 */
+[data-theme="light"] {
+  --md-heading: #1f4e79;
+  --md-code: #99307b;
+  --md-str: #a66b2f;
+}
+[data-theme="dark"] {
+  --md-heading: #7cc0ff;
+  --md-code: #f29bc8;
+  --md-str: #e0b07c;
+}
+
 /* ---------- Markdown preview (experimental) ---------- */
 .editor-wrap-host > .editor-wrap {
   flex: 1;
