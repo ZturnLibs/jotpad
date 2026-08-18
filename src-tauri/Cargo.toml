@@ -1,6 +1,6 @@
 [package]
 name = "jotpad"
-version = "0.2.0"
+version = "0.2.1"
 description = "Jotpad — A cross-platform notepad"
 authors = ["Jotpad"]
 edition = "2021"
