@@ -255,6 +255,15 @@ export function getMenuModel(): MenuModel {
       disabled: !s.settings.experimental?.markdown || !/\.(md|markdown|mdx)$/i.test(activeTab?.filePath ?? ""),
     },
     {
+      id: "mdViewToggle",
+      label: t("view.mdLive"),
+      checked:
+        !!s.settings.experimental?.mdLive && s.settings.mdViewMode !== "source",
+      disabled:
+        !s.settings.experimental?.mdLive ||
+        !/\.(md|markdown|mdx)$/i.test(activeTab?.filePath ?? ""),
+    },
+    {
       id: "theme",
       label: t("view.theme"),
       submenu: (["light", "dark", "system"] as ThemeMode[]).map((m) => ({
@@ -469,6 +478,13 @@ export function runMenuAction(id: string): void {
       break;
     case "markdownPreview":
       if (s.settings.experimental?.markdown) s.setPreviewOpen(!s.previewOpen);
+      break;
+    case "mdViewToggle":
+      if (s.settings.experimental?.mdLive) {
+        s.setSettings({
+          mdViewMode: s.settings.mdViewMode === "source" ? "live" : "source",
+        });
+      }
       break;
     case "settings":
       s.setSettingsOpen(true);

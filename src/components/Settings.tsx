@@ -428,8 +428,16 @@ export function Settings() {
                     }
                     label={t("settings.exp.markdown")}
                   />
+                  <Toggle
+                    on={!!settings.experimental.mdLive}
+                    onChange={(v) =>
+                      setSettings({ experimental: { ...settings.experimental, mdLive: v } })
+                    }
+                    label={t("settings.exp.mdLive")}
+                  />
                 </div>
                 <p className="settings-hint muted">{t("settings.exp.markdownDesc")}</p>
+                <p className="settings-hint muted">{t("settings.exp.mdLiveDesc")}</p>
                 <p className="settings-hint muted">{t("settings.experimentalHint")}</p>
               </SettingsSection>
               <SettingsSection title={t("settings.startup")}>

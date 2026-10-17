@@ -146,6 +146,10 @@ export const SHORTCUTS: readonly ShortcutDef[] = [
   },
   {
     id: "markdownPreview",
+    // 分栏预览过渡期仅菜单入口；M4 移除（见 docs/design-md-live-preview.md）
+  },
+  {
+    id: "mdViewToggle",
     chords: [{ key: "/", mod: true }],
     label: `${MOD}+/`,
     accel: A("/"),
