@@ -1,96 +1,81 @@
-# Jotpad · 跨平台纯文本记事本
+<p align="center">
+  <img src="app-icon.svg" width="110" alt="Jotpad 图标" />
+</p>
 
-> 文档导航：[设计决策与功能记录](DECISIONS.md) · [路线图](ROADMAP.md) · [发布流程](.agents/skills/jotpad-release/SKILL.md)
+<h1 align="center">Jotpad</h1>
 
-Jotpad 是一款用 **Tauri 2 + React + TypeScript + CodeMirror 6** 构建的跨平台（macOS / Linux / Windows）纯文本记事本。
+<p align="center">
+  <strong>快到没有存在感的跨平台文本记事本</strong><br/>
+  macOS · Windows · Linux ｜ 无账号 · 无订阅 · 无云端
+</p>
 
-## 为什么选 Jotpad
+<p align="center">
+  <a href="https://github.com/ZturnLibs/jotpad/releases/latest">📥 免费下载</a> ·
+  <a href="https://github.com/ZturnLibs/jotpad/releases">📦 全部版本</a>
+</p>
 
-- **本地优先，不锁数据** —— 文件就是普通 `.txt` / `.md`，存在你自己的磁盘上；随时用任何工具打开、迁移、同步（iCloud / Git 均可）
-- **原生轻快** —— Tauri 原生壳而非 Electron，安装包小、启动到可输入体感明显快于 IDE
-- **草稿永不丢** —— 未保存内容自动持久化；关掉重开，上次的标签、光标、滚动位置都在
-- **一次性买断** —— 无订阅、无账号、无云端
+<p align="center">
+  <img src="docs/assets/screenshot-main.png" width="820" alt="Jotpad 主界面：多标签、文件列表、Markdown 语法配色" />
+</p>
 
-## 功能一览
+---
 
-- 左右分栏：左侧文档列表（可固定常用文件置顶），右侧编辑区
-- 多标签页、命名会话、启动恢复
-- **跨文件全文搜索**（`Cmd/Ctrl+Shift+H`）：在打开标签 + 最近文件 + 默认保存目录中按内容检索，命中分组高亮、一键跳转
-- **快速打开**（`Cmd/Ctrl+P`）：文件名模糊搜索，含从未打开过的保存目录文件
-- **文档大纲**（`Cmd/Ctrl+Shift+O`）：Markdown 标题树过滤与跳转
-- 多编码读写（UTF-8 / UTF-16 / GBK / Big5 / Shift-JIS / EUC-KR / Windows-1252，自动检测 + BOM）
-- 外部文件变更检测（提示重新加载或保留）；与磁盘版本对比 diff
-- 查找 / 替换（区分大小写、正则、匹配计数）；中文双击按词选中（分词感知）
-- 大文件自动只读（>2MB）；手动只读模式（锁图标/状态栏/工具栏）
-- 字体 / 字号、缩放、自动换行、可选行号、拼写检查、强调色
-- 浅色 / 深色 / 跟随系统主题；中文 / English 界面
-- 完整快捷键、拖拽打开、打印与页面设置、本地历史快照
-- 系统托盘 + 全局唤起（`Cmd/Ctrl+Shift+J`）；可选右键「新建文本文件」/「用 Jotpad 打开」
-- **实验特性**：Markdown 语法高亮 + 分栏实时预览（设置中开启，默认关）
+## 这些瞬间，你是不是也经历过
 
-## 开发
+- 🧾 打开多年前的老文档，满屏乱码和问号
+- 🐢 只想记一句话，IDE 却转了半分钟启动动画
+- 💨 手一滑关掉窗口，刚敲的字全没了
+- 🔐 记个笔记，还得先登录、联网、接受会员协议
+- 🤖 文件被别的程序改了，编辑器要么毫无反应，要么反复弹窗骚扰
 
-```bash
-pnpm install
-pnpm tauri dev
-```
+**Jotpad 就是来解决这些的。** 它比系统记事本强得多，又比 IDE / 云笔记轻得多——打开就能写，写完不用管。
 
-单元测试：
+## 为什么用过的人回不去了
 
-```bash
-pnpm test
-```
+### ⚡ 秒开，一敲字就响应
+原生内核（非 Electron），Windows / macOS 安装包只有约 6MB，启动即输入。它快到你意识不到「开了个软件」，只觉得多了张纸。
 
-## 打包
+### 🗂 多标签 + 会话，工作现场永不散场
+像浏览器一样开一堆标签；左侧文件列表常驻，常用文件一键置顶。关掉再打开，上次的标签、光标位置、滚动位置原样奉还；「昨天那组文件」存成命名会话，今天一键回来。
 
-```bash
-pnpm tauri build            # 产出当前平台安装包
-# 或仅验证可执行：
-pnpm tauri build --debug --no-bundle
-```
+### 🔤 乱码克星
+UTF-8 / GBK / Big5 / Shift-JIS / EUC-KR / UTF-16 / Windows-1252 全支持，打开自动检测编码，另存时可任意转换。Windows 同事发来的文件、十年前的老档案，打开都是人话。行尾 CRLF / LF / CR、BOM 同样一键处理。
 
-产物目录：`src-tauri/target/release/bundle/`。
+### 💾 草稿永不丢，历史随时回
+写下的每个字都在落盘——崩溃、断电、手滑关窗口，重开都在。每次保存自动快照到**本地历史**，误删一段、改错一版，打开历史面板找回。文件被其他程序改动时智能提醒：内容没变不打扰，真变了才问你要不要重新加载，未保存的修改先备进历史再替换，永远不会悄悄吞掉你的字。
 
-> 构建需要 Rust 工具链与各平台 WebView 运行时（macOS 自带；Linux 需 `webkit2gtk`；Windows 自带 WebView2）。
->
-> 重新生成应用图标：`pnpm icon`
+### 🔍 你的文件，搜得到、找得快
+- **跨文件全文搜索**：在打开的、最近的、保存目录里的所有文件中按内容检索，命中分组高亮、一键跳转
+- **快速打开**（`Cmd/Ctrl+P`）：文件名模糊匹配，从未打开过的也能搜到
+- **Markdown 大纲**（`Cmd/Ctrl+Shift+O`）：标题树过滤跳转，长文不迷路
 
-## 发布
+### 🔒 文件就是你的文件
+存的统统是普通 `.txt` / `.md`，躺在你自己磁盘的目录里。iCloud、Git、U 盘、网盘——想怎么同步怎么同步；哪天不想用 Jotpad 了，任何编辑器都能无缝接管。**没有账号，没有订阅，没有云端，没有锁定。**
 
-版本号需在以下三处保持一致：
+## 还有这些顺手的小设计
 
-- `package.json`
-- `src-tauri/Cargo.toml`
-- `src-tauri/tauri.conf.json`
+| | |
+| --- | --- |
+| **Markdown 增强**（实验特性） | 语法高亮、分栏实时预览、`Cmd/Ctrl+B` 加粗、任务列表样式 |
+| **中文友好** | 双击按词选中（分词感知）、中英文界面一键切换 |
+| **查找替换** | 正则、区分大小写、匹配计数、逐项跳转 |
+| **语音听写** | 本地语音包，开会对着说就能记（无需联网） |
+| **大文件保护** | 超大文件自动只读防卡死，也可手动锁定防误改 |
+| **桌面集成** | 托盘常驻、全局唤起（`Cmd/Ctrl+Shift+J`）、右键「新建文本文件 / 用 Jotpad 打开」、拖拽开文件 |
+| **外观** | 深色 / 浅色 / 跟随系统，自定义强调色、字体字号缩放、行号、自动换行 |
+| **杂项利器** | 转到行、插入时间日期、窗口置顶、打印与页面设置、与磁盘版本 diff 对比、自动更新 |
 
-推送 `v*` tag 会触发 GitHub Actions，构建 macOS（arm64 / x64）、Windows、Linux x64 安装包并写入 [GitHub Releases](https://github.com/ZturnLibs/jotpad/releases)：
+## 下载
 
-```bash
-# 确认三处 version 已更新，例如 0.1.2
-git tag v0.1.2
-git push origin v0.1.2
-```
+前往 [Releases](https://github.com/ZturnLibs/jotpad/releases/latest) 免费获取：
 
-也可在 Actions 页手动运行 `release` workflow。关于对话框版本来自 `tauri.conf.json`（`getVersion()`）。
+| 系统 | 安装包 |
+| --- | --- |
+| macOS（Apple Silicon / Intel） | `.dmg`、`.pkg` |
+| Windows | `setup.exe`（NSIS）、`.msi` |
+| Linux | `.AppImage`、`.deb`、`.rpm` |
 
-应用内更新（`plugin-updater`）读取：
-
-`https://github.com/ZturnLibs/jotpad/releases/latest/download/latest.json`
-
-发版 CI 需配置 Secrets：`TAURI_SIGNING_PRIVATE_KEY`、`TAURI_SIGNING_PRIVATE_KEY_PASSWORD`（可空）、`RELEASE_TOKEN`。私钥丢失后已安装客户端将无法验签升级，须妥善备份 `~/.tauri/jotpad.key`。
-
-Linux 应用内升级仅覆盖 **AppImage**；`.deb`/`.rpm` 用户会提示打开发布页手动安装。
-
-### 发布前检查清单
-
-- [ ] `pnpm test` 与 `pnpm build` 通过
-- [ ] `pnpm tauri build` 在目标平台成功（或等待 CI Release 产物）
-- [ ] macOS：系统菜单、Overlay 标题栏拖拽、红绿灯安全区
-- [ ] Windows：窗口菜单栏、字体/对话框、新建窗口无 Overlay 异常
-- [ ] Linux：GTK 菜单条、webkit2gtk 依赖说明
-- [ ] 打开 / 保存 / 另存为 / 重命名 / 最近文件
-- [ ] 外部修改文件后的重新加载提示
-- [ ] 未保存关闭 / 退出确认与草稿恢复
+安装后应用内自动检查更新，一键升级。
 
 ## 快捷键
 
@@ -103,65 +88,35 @@ Linux 应用内升级仅覆盖 **AppImage**；`.deb`/`.rpm` 用户会提示打�
 | 另存为 | `Ctrl+Shift+S` | `Cmd+Shift+S` |
 | 关闭标签页 | `Ctrl+W` | `Cmd+W` |
 | 切换标签 | `Ctrl+Tab` / `Ctrl+PageDown/Up` / `Ctrl+1…9` | `Ctrl+Tab` / `Cmd+Option+←/→` / `Cmd+1…9` |
-| 查找 | `Ctrl+F` | `Cmd+F` |
-| 替换 | `Ctrl+H` | `Cmd+Option+F` |
+| 查找 / 替换 | `Ctrl+F` / `Ctrl+H` | `Cmd+F` / `Cmd+Option+F` |
 | 查找下一个 / 上一个 | `F3` / `Shift+F3` | `F3` / `Shift+F3` |
 | 转到行 | `Ctrl+G` | `Cmd+G` |
 | 撤销 / 重做 | `Ctrl+Z` / `Ctrl+Y` | `Cmd+Z` / `Cmd+Shift+Z` |
-| 全选 | `Ctrl+A` | `Cmd+A` |
 | 窗口置顶 | `Ctrl+Shift+T` | `Cmd+Shift+T` |
 | 插入时间/日期 | `F5` | `F5` |
-| 放大 / 缩小 / 重置缩放 | `Ctrl+=` / `Ctrl+-` / `Ctrl+0` | `Cmd+=` / `Cmd+-` / `Cmd+0` |
-| 打印 | 文件菜单 | 文件菜单 |
+| 放大 / 缩小 / 重置 | `Ctrl+=` / `Ctrl+-` / `Ctrl+0` | `Cmd+=` / `Cmd+-` / `Cmd+0` |
 | 设置 | `Ctrl+,` | `Cmd+,` |
 | 关闭面板 | `Esc` | `Esc` |
 
-## 项目结构
+## 数据在哪里
 
-```
-src/
-├── App.tsx              # 布局 / 主题 / 快捷键 / 拖拽 / 外部变更检测
-├── store/useStore.ts    # 标签页、设置、文件、草稿、最近文件
-├── lib/                 # backend / i18n / menu / search / print / utils
-├── components/          # TabBar / Toolbar / Editor / FindBar / StatusBar / …
-└── styles/
+草稿、设置与本地历史都保存在本机应用数据目录，不上传任何服务器：
 
-src-tauri/src/           # 多编码读写、重命名、mtime、菜单、状态持久化
-```
-
-## 平台适配
-
-- **macOS**：系统菜单栏；窗口 Overlay 标题栏；侧栏顶部预留红绿灯；新建窗口同样使用 Overlay。
-- **Linux / Windows**：应用菜单挂到窗口；新建窗口使用标准装饰标题栏（非 Overlay）。
-- 菜单模型与动作分发共用 `menuActions.ts`，前端通过 `set_app_menu` 刷新原生菜单。
-
-## 数据存储
-
-草稿与设置写入应用数据目录：
-
-- macOS: `~/Library/Application Support/com.jotpad.app/jotpad-state.json`
-- Linux: `~/.local/share/com.jotpad.app/jotpad-state.json`
-- Windows: `%APPDATA%\com.jotpad.app\jotpad-state.json`
-
-未保存修改在退出前会提示；异常退出后下次启动可恢复草稿。
+- macOS: `~/Library/Application Support/com.jotpad.app/`
+- Linux: `~/.local/share/com.jotpad.app/`
+- Windows: `%APPDATA%\com.jotpad.app\`
 
 ## 便携版与企业部署
 
-### 便携版（Portable）
+**便携版**：在 Jotpad 可执行文件同级目录创建一个名为 `jotpad.portable` 的空文件，所有数据（草稿、设置、历史）即随身存放在程序旁的 `data/` 目录——U 盘即插即用，不留痕迹。
 
-在可执行文件（或 `.app/Contents/MacOS/` 内的可执行文件）同级目录创建一个名为 `jotpad.portable` 的空文件，即可启用便携模式：所有数据（草稿/设置、语音、历史、日志、shell 集成标记）都会写入程序同级的 `data/` 目录，不再写入系统应用数据目录——适合 U 盘携带或只读环境运行。
+**静默安装**：
 
-```bash
-# 示例（Windows）
-Jotpad.exe 所在目录下新建空文件：jotpad.portable
-# 之后运行 Jotpad.exe，数据将存于同目录的 data\
-```
+- Windows MSI：`msiexec /i Jotpad_<版本>_x64_zh-CN.msi /qn /norestart`
+- Windows NSIS：`Jotpad_<版本>_x64-setup.exe /S`
+- macOS：`.pkg` 可经 MDM（如 Jamf）分发，或 `sudo installer -pkg Jotpad.pkg -target /`
+- Linux：`sudo dpkg -i Jotpad_<版本>_amd64.deb`，或直接运行 AppImage
 
-### 静默安装 / 企业部署
+---
 
-- **Windows MSI**：`msiexec /i Jotpad_<版本>_x64_zh-CN.msi /qn /norestart`
-- **Windows NSIS（setup.exe）**：`Jotpad_<版本>_x64-setup.exe /S`（`/S` 为 NSIS 静默参数）
-- **macOS**：`.pkg`/`.dmg` 可经 MDM（如 Jamf）分发；`sudo installer -pkg Jotpad.pkg -target /`
-- **Linux**：`sudo dpkg -i Jotpad_<版本>_amd64.deb` 或直接运行 AppImage
-
-便携模式下上述“静默安装”通常无需——解压即用、数据随身。
+开发指南与发布流程见 [DEVELOPMENT.md](DEVELOPMENT.md) ｜ 设计决策 [DECISIONS.md](DECISIONS.md) ｜ 路线图 [ROADMAP.md](ROADMAP.md)

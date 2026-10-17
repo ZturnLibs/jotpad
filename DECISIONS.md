@@ -1,9 +1,10 @@
 # Jotpad 设计决策与功能记录
 
 > 本文记录 Jotpad 的**关键技术决策**（为什么这么做、权衡、踩过的坑）与**已完成功能**，供后续开发与维护参考。
-> - 使用说明、构建与快捷键 → `README.md`
+> - 用户介绍、快捷键、下载 → `README.md`
+> - 构建、项目结构、发布流程 → `DEVELOPMENT.md`
 > - 路线图与待办 → `ROADMAP.md`
-> - 发布流程 → `.agents/skills/jotpad-release/SKILL.md` + `scripts/release.mjs`
+> - 发布脚本 → `.agents/skills/jotpad-release/SKILL.md` + `scripts/release.mjs`
 
 ---
 
