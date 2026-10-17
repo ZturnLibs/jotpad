@@ -1125,9 +1125,28 @@ textarea {
 .cm-md-live-block h4 { font-size: 1.1em; margin: 0.24em 0 0.08em; }
 .cm-md-live-block h5 { font-size: 1.05em; margin: 0.22em 0 0.06em; }
 .cm-md-live-block h6 { font-size: 1em; margin: 0.2em 0 0.05em; }
-.cm-md-live-block p { margin: 0.2em 0; }
+.cm-md-live-block p { margin: 0.1em 0; }
+/* 列表：几何与源码精确对齐（渲染文本为等宽字体，•/- 同为 1ch）——顶部 ul 零缩进，::before 占 2ch；
+   嵌套 ul/ol 每级 +2ch，对应源码两级缩进。
+   显式 counter-reset: li / counter(li)：不依赖 UA list-item 计数器（list-style:none 下引擎行为不一），两种引擎均稳定 */
 .cm-md-live-block ul,
-.cm-md-live-block ol { padding-left: 1.6em; margin: 0.25em 0; }
+.cm-md-live-block ol { padding-left: 0; margin: 0.1em 0; list-style: none; counter-reset: li; }
+.cm-md-live-block ul ul,
+.cm-md-live-block ol ol,
+.cm-md-live-block ul ol,
+.cm-md-live-block ol ul { padding-left: 2ch; margin: 0; }
+.cm-md-live-block ul > li::before {
+  content: "•";
+  display: inline-block;
+  width: 2ch;
+}
+.cm-md-live-block ol > li::before {
+  content: counter(li) ".";
+  counter-increment: li;
+  display: inline-block;
+  width: 3ch;
+  text-align: right;
+}
 .cm-md-live-block code {
   font-size: 0.9em;
   background: var(--bg-hover);
@@ -1137,17 +1156,18 @@ textarea {
 .cm-md-live-block pre {
   background: var(--bg-hover);
   border-radius: var(--radius);
-  padding: 10px 12px;
+  padding: 2px 0;
   overflow-x: auto;
-  margin: 0.3em 0;
+  margin: 0.25em 0;
 }
 .cm-md-live-block pre code {
   background: none;
   padding: 0;
 }
+/* 引用：左边框 3px + (2ch-3px) 内边距 = 文本落点 2ch，与源码 "> " 精确对齐 */
 .cm-md-live-block blockquote {
-  margin: 0.3em 0;
-  padding: 0.2em 1em;
+  margin: 0.15em 0;
+  padding: 0.1em calc(2ch - 3px);
   border-left: 3px solid var(--accent);
   color: var(--text-secondary);
 }
@@ -1157,15 +1177,21 @@ textarea {
 .cm-md-live-block th { background: var(--bg-hover); }
 .cm-md-live-block img { max-width: 100%; }
 .cm-md-live-block a { color: var(--accent); }
-.cm-md-live-block hr { border: none; border-top: 1px solid var(--border); margin: 0.45em 0; }
+/* 分隔线：上下边距合计 ≈ 一个源码行高，切换高度中性 */
+.cm-md-live-block hr { border: none; border-top: 1px solid var(--border); margin: 0.85em 0; }
 .cm-md-live-block input[type="checkbox"] {
   margin-right: 0.45em;
   accent-color: var(--accent);
   vertical-align: middle;
 }
+/* 任务列表：标记位让位于复选框（源码 "- [ ] " 6ch 的精确对齐为 M2c 已知项）；
+   旧 margin-left:-1.2em 是对已删除的 ul padding-left:1.6em 的补偿，随本组几何改为 0 */
 .cm-md-live-block li:has(> input[type="checkbox"]) {
   list-style: none;
-  margin-left: -1.2em;
+  margin-left: 0;
+}
+.cm-md-live-block li:has(> input[type="checkbox"])::before {
+  content: none;
 }
 .cm-md-live-block a.md-link-blocked {
   color: var(--text-secondary);
