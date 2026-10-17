@@ -1107,7 +1107,8 @@ textarea {
 .cm-md-live-block {
   display: flow-root; /* 围合内部边距：防止 h1/p 边距逃逸出 widget 导致视觉高度≠CM 测量高度 */
   line-height: 1.7; /* 与编辑器源码行高一致：段落块切换高度中性 */
-  padding: 0 16px; /* 块装饰整体占有行空间后不再套 .cm-line，自带与源码行一致的水平内边距 */
+  padding: 0 16px; /* jsdom 挂载实测（decorations.mount.test.ts）：widget 直挂 .cm-content，不套 .cm-line，
+     故 .cm-line 的 padding:0 16px 不作用于 widget，此处是唯一水平内边距，不可删（删即翻转偏移 16px） */
   color: var(--editor-text);
 }
 .cm-md-live-block h1,
@@ -1127,10 +1128,10 @@ textarea {
 .cm-md-live-block h6 { font-size: 1em; margin: 0.2em 0 0.05em; }
 .cm-md-live-block p { margin: 0.1em 0; }
 /* 列表：几何与源码精确对齐（渲染文本为等宽字体，•/- 同为 1ch）——顶部 ul 零缩进，::before 占 2ch；
-   嵌套 ul/ol 每级 +2ch，对应源码两级缩进。
+   嵌套 ul/ol 每级 +2ch，对应源码两级缩进。margin 归零：源码行无边距，每 1em 边距都是翻转高度差。
    显式 counter-reset: li / counter(li)：不依赖 UA list-item 计数器（list-style:none 下引擎行为不一），两种引擎均稳定 */
 .cm-md-live-block ul,
-.cm-md-live-block ol { padding-left: 0; margin: 0.1em 0; list-style: none; counter-reset: li; }
+.cm-md-live-block ol { padding-left: 0; margin: 0; list-style: none; counter-reset: li; }
 .cm-md-live-block ul ul,
 .cm-md-live-block ol ol,
 .cm-md-live-block ul ol,
@@ -1166,7 +1167,7 @@ textarea {
 }
 /* 引用：左边框 3px + (2ch-3px) 内边距 = 文本落点 2ch，与源码 "> " 精确对齐 */
 .cm-md-live-block blockquote {
-  margin: 0.15em 0;
+  margin: 0.1em 0;
   padding: 0.1em calc(2ch - 3px);
   border-left: 3px solid var(--accent);
   color: var(--text-secondary);

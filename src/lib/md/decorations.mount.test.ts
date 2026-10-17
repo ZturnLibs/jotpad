@@ -102,4 +102,32 @@ describe("mdLivePreview 挂载", () => {
       errSpy.mockRestore();
     }
   });
+
+  it("widget 水平定位与源码一致（.cm-line 内边距归属）", async () => {
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const view = new EditorView({
+      state: EditorState.create({
+        // 光标放引导段 → 列表块渲染为 widget（单块文档光标必在块内，永不渲染）
+        doc: "引导\n\n- 列表项",
+        selection: { anchor: 0 },
+        extensions: [mdLivePreview()],
+      }),
+      parent: host,
+    });
+    try {
+      await flush();
+      const widget = host.querySelector(".cm-md-live-block");
+      expect(widget).toBeTruthy();
+      // jsdom 实测结构（block:true 替换装饰）：widget 直接挂在 .cm-content 下，
+      // 不在 .cm-line 内 → .cm-line 的 padding:0 16px 不作用于 widget，
+      // widget 自身的 padding:0 16px 是唯一水平内边距（删掉即翻转偏移 16px）。
+      // CM 升级若把 widget 套进 .cm-line（双重 16px 偏移），此断言变红以提醒同步 CSS。
+      expect(widget!.closest(".cm-line")).toBeNull();
+      expect(widget!.parentElement?.classList.contains("cm-content")).toBe(true);
+    } finally {
+      view.destroy();
+      host.remove();
+    }
+  });
 });
