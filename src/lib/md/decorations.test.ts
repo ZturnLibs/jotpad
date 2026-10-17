@@ -2,6 +2,7 @@
 import { describe, expect, it } from "vitest";
 import { EditorSelection, EditorState } from "@codemirror/state";
 import { buildBlockDecorations } from "@/lib/md/decorations";
+import { parseBlocks } from "@/lib/md/blocks";
 
 function stateWith(doc: string, anchor: number, head = anchor): EditorState {
   return EditorState.create({ doc, selection: { anchor, head } });
@@ -54,5 +55,20 @@ describe("buildBlockDecorations", () => {
       n++;
     });
     expect(n).toBe(0);
+  });
+
+  it("替换区间吞并块间分隔空行（间距由边距提供）", () => {
+    // 标题后 3 个空行，光标在段落内（段=8）→ 标题块被渲染
+    const gapDoc = "# 标题\n\n\n\n段落";
+    const state = stateWith(gapDoc, 9);
+    let rangeEnd = -1;
+    buildBlockDecorations(state, 0, state.doc.length, false).between(0, 5, (from, to) => {
+      if (from === 0) rangeEnd = to;
+    });
+    // 不变量：标题块装饰终点 == 下一块（段落）的 from，即块尾换行 + 3 个分隔空行被吞并
+    const expected = parseBlocks(gapDoc)[1].from;
+    expect(rangeEnd).toBe(expected);
+    // 手算锚点：# 标题(0..3) + 4 个 \n(4..7) → 段落 from=8（防止 parseBlocks 漂移使断言空转）
+    expect(expected).toBe(8);
   });
 });

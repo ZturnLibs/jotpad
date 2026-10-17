@@ -80,9 +80,11 @@ export function buildBlockDecorations(
     const block = blocks[i];
     const html = renderBlockHtml(text.slice(block.from, block.to));
     if (html == null) continue;
+    // 吞掉块尾换行与块间分隔空行：间距完全由 widget 边距提供，避免「空行+边距」双重间距
+    const end = i + 1 < blocks.length ? blocks[i + 1].from : text.length;
     builder.add(
       from + block.from,
-      from + block.to,
+      from + end,
       Decoration.replace({ widget: new BlockWidget(html, from + block.from, from + block.to) }),
     );
   }
