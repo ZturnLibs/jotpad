@@ -19,6 +19,7 @@ import { findNext, findPrevious, search, selectSelectionMatches } from "@codemir
 import { useStore } from "@/store/useStore";
 import { emitEditorInfo, isProgrammaticDocChange, setEditorView, viewInfo } from "@/lib/editorRef";
 import { cjkWordSelection } from "@/lib/cjkSelection";
+import { mdLivePreview } from "@/lib/md/decorations";
 
 function spellcheckExt(on: boolean) {
   return EditorView.contentAttributes.of({
@@ -26,12 +27,16 @@ function spellcheckExt(on: boolean) {
   });
 }
 
-/** 实验特性 markdown：仅 .md/.markdown/.mdx 文件启用。 */
+/** 即时渲染熔断阈值：超过 2MB 不挂 live 扩展（与大文件只读同阈值）。 */
+const LIVE_MAX_SIZE = 2_000_000;
+
+/** 实验特性 markdown：仅 .md/.markdown/.mdx 文件启用（分栏或即时渲染任一开启）。 */
 function markdownEnabled(
   settings: { experimental: Record<string, boolean> },
   filePath: string | null,
 ): boolean {
-  if (!settings.experimental?.markdown || !filePath) return false;
+  if (!filePath) return false;
+  if (!settings.experimental?.markdown && !settings.experimental?.mdLive) return false;
   return /\.(md|markdown|mdx)$/i.test(filePath);
 }
 
@@ -96,6 +101,8 @@ export function Editor() {
   const activeTabId = useStore((s) => s.activeTabId);
   const tab = useStore((s) => s.tabs.find((t) => t.id === s.activeTabId));
   const settings = useStore((s) => s.settings);
+  const findOpen = useStore((s) => s.findOpen);
+  const replaceOpen = useStore((s) => s.replaceOpen);
 
   useEffect(() => {
     if (!hostRef.current) return;
@@ -249,15 +256,31 @@ export function Editor() {
     });
   }, [tab?.readOnly]);
 
+  // 即时渲染：mdLive 开启 + live 模式 + 非大文件时挂 live 扩展（2MB 与大文件只读同阈值）
   useEffect(() => {
+    const md = markdownEnabled(settings, tab?.filePath ?? null);
+    const live =
+      md &&
+      !!settings.experimental?.mdLive &&
+      settings.mdViewMode !== "source" &&
+      (tab?.size ?? 0) <= LIVE_MAX_SIZE;
     viewRef.current?.dispatch({
       effects: langCompartment.current.reconfigure(
-        markdownEnabled(settings, tab?.filePath ?? null)
-          ? [markdownLang(), syntaxHighlighting(mdHighlight)]
+        md
+          ? [
+              markdownLang(),
+              syntaxHighlighting(mdHighlight),
+              ...(live ? mdLivePreview() : []),
+            ]
           : [],
       ),
     });
-  }, [settings.experimental, tab?.filePath, settings]);
+  }, [settings.experimental, settings.mdViewMode, tab?.filePath, tab?.size, settings]);
+
+  // 查找/替换面板开合不产生 CM 事务，派发空事务触发装饰插件重建。
+  useEffect(() => {
+    viewRef.current?.dispatch({});
+  }, [findOpen, replaceOpen]);
 
   const fontSize = settings.fontSize * (settings.zoom / 100);
 
