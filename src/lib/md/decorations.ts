@@ -8,7 +8,14 @@ import {
   type ViewUpdate,
   WidgetType,
 } from "@codemirror/view";
-import { type EditorState, type Extension, RangeSetBuilder } from "@codemirror/state";
+import {
+  StateEffect,
+  StateField,
+  type EditorState,
+  type Extension,
+  RangeSet,
+  RangeSetBuilder,
+} from "@codemirror/state";
 import { type BlockInfo, parseBlocks } from "@/lib/md/blocks";
 import { renderBlockHtml } from "@/lib/md/render";
 import { useStore } from "@/store/useStore";
@@ -95,30 +102,65 @@ const mdLinkHandlers = EditorView.domEventHandlers({
   },
 });
 
-/** 挂到编辑器扩展集。doc/选区/视口（及任何事务）变化时重建（视口内重算，M1 实现足够）。 */
+/** 视口装饰集的搬运通道：ViewPlugin 算出集后经此效果写入下方 StateField。 */
+const setLiveDecorations = StateEffect.define<DecorationSet>();
+
+/**
+ * 装饰必须经 StateField 静态供给：CM6 禁止 ViewPlugin 提供跨行替换/块装饰
+ * （RangeError: Decorations that replace line breaks may not be specified via plugins）。
+ * 效果到达取效果值；无效果而文档已变时映射旧集，保证两次事务之间不持有过期区间。
+ */
+const liveDecorationsField = StateField.define<DecorationSet>({
+  create: () => Decoration.none,
+  update(value, tr) {
+    let next = value;
+    let has = false;
+    for (const e of tr.effects) {
+      if (e.is(setLiveDecorations)) {
+        next = e.value;
+        has = true;
+      }
+    }
+    if (!has && tr.docChanged) return value.map(tr.changes);
+    return next;
+  },
+});
+
+/** 挂到编辑器扩展集。ViewPlugin 负责视口/抑制态检测并经 effect 派发（保留视口窗口化）。 */
 export function mdLivePreview(): Extension[] {
   return [
+    liveDecorationsField,
+    EditorView.decorations.from(liveDecorationsField),
     ViewPlugin.fromClass(
       class {
-        decorations: DecorationSet;
+        /** 上次派发的装饰集；eq 相同则不再派发，否则派发自身又触发 update 会死循环。 */
+        private last = Decoration.none;
         constructor(view: EditorView) {
-          this.decorations = buildBlockDecorations(
+          this.sync(view);
+        }
+        update(u: ViewUpdate) {
+          this.sync(u.view);
+        }
+        /**
+         * 重算视口装饰并派发。不能同步 view.dispatch：CM 6.43.6 在更新进行中调用
+         * update 会抛错，且该异常会被 CM 捕获后直接击杀本插件；故经微任务在
+         * 更新周期结束后派发（CM 自身对延迟派发亦用同款微任务模式）。
+         */
+        private sync(view: EditorView) {
+          const set = buildBlockDecorations(
             view.state,
             view.viewport.from,
             view.viewport.to,
             suppressed(),
           );
-        }
-        update(u: ViewUpdate) {
-          this.decorations = buildBlockDecorations(
-            u.view.state,
-            u.view.viewport.from,
-            u.view.viewport.to,
-            suppressed(),
-          );
+          // RangeSet 无实例 eq，用静态 RangeSet.eq 全区间比较（widget 经 BlockWidget.eq）
+          if (RangeSet.eq([this.last], [set])) return;
+          this.last = set;
+          queueMicrotask(() => {
+            view.dispatch({ effects: setLiveDecorations.of(set) });
+          });
         }
       },
-      { decorations: (v) => v.decorations },
     ),
     mdLinkHandlers,
   ];
