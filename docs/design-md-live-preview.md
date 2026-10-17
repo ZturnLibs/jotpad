@@ -44,7 +44,7 @@ src/lib/md/
 ```
 
 - **blocks.ts**：`BlockInfo = { from, to, type }`，type ∈ heading / list / quote / code / table / hr / paragraph。输入为视口行 + 现有 lezer markdown 树（依赖已存在），不新引解析器。可单测。
-- **render.ts**：`renderBlock(text, type) → string`（HTML）。逐块调用 marked（与分栏预览同源，保证两边渲染一致），输出过 sanitize。单块渲染失败 → 返回 null，调用方回退源码显示，**不允许空白**。
+- **render.ts**：`renderBlock(text, type) → string`（HTML）。逐块调用 marked（与分栏预览同源，保证两边渲染一致），输出过 sanitize。单块渲染失败 → 返回 null，调用方回退源码显示，**不允许空白**。两处排版语义（冒烟修复十二）：escapeHtml 只转义 `&` 与 `<`（`>` 是引用块标记，转义会让 marked 把引用当纯文本）；渲染 widget 宿主 `white-space: normal`（编辑器 .cm-content 为 break-spaces，marked 标签间换行会被渲染成幽灵空行盒，每处 ≈ 一行高；pre 单独恢复 `pre`）。
 - **decorations.ts**：ViewPlugin 监听 doc/selection/viewport 变化重建装饰；只处理视口内块；doc 变更仅重算受影响行区间。产出 `DecorationSet`。
 - **tableWidget.ts**：`WidgetType` 子类渲染表格 DOM；`applyBlockEdit(view, blockRange, newText)` 以 `userEvent: "input"` 派发变更（进原生撤销栈）。
 - **mode.ts**：`settings.experimental.mdLive`（总开关，默认关）+ `settings.mdViewMode: "live" | "source"`（视图偏好，开 mdLive 时默认 live）。`Cmd/Ctrl+/` 切换视图偏好并持久化。
@@ -55,6 +55,12 @@ src/lib/md/
 ### 块激活与选区
 
 - 块激活 = 选区与块区间 `(from, to)` 相交；**块尾边界与块间空隙位置不属于任何活动块**（相邻块保持渲染，首个键入字符后该块立即转源码）。
+- **方向键逐视觉行移动（修复十二）**：渲染块不含光标位置，CM6 原生纵向移动会跳过块 widget
+  直取「下一个文本位置」——渲染态全文只有活动块是文本，原生行为两次按键直跳文档首尾。
+  mdArrowNav（Prec.high 的 keydown 拦截）探测紧邻下一视觉行：落入渲染块则按比例映射光标
+  进块并激活（复用点击映射 mapPointIntoBlock）；下一行仍是文本行时交还原生。PgUp/PgDn 同
+  策略（探测距 = 0.8×视口高）。探针步长 ≈ 半行行高（posAtCoords 文本盒含半行距，+1px
+  会命中本行行盒）。
 - **多光标（Mod-d / Alt+点击）→ 整档回源码**（与跨块选区同策略，避免盲编辑不可见文本）。
 - **选区跨块 → 整个文档临时回源码视图**；选区收回单块内恢复渲染。
 - 查找/替换面板打开期间，全文档临时源码化（命中高亮不进 widget），关闭后恢复。

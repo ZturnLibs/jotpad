@@ -130,4 +130,99 @@ describe("mdLivePreview 挂载", () => {
       host.remove();
     }
   });
+
+  // jsdom 无布局：coordsAtPos / elementFromPoint 均无真实实现，以 stub 构造
+  // 「下一视觉行落在渲染块内」的几何条件，验证方向键命中渲染块时激活该块。
+  it("方向键进入渲染块：光标映射进块并激活（块转源码）", async () => {
+    const errSpy = vi.spyOn(console, "error").mockImplementation((...args: unknown[]) => {
+      crashes.push(args.map(String).join(" "));
+    });
+    const hostEl = document.createElement("div");
+    document.body.appendChild(hostEl);
+    const view = new EditorView({
+      state: EditorState.create({
+        // 光标在标题（源码）→ 段落块渲染为 widget
+        doc: "# 标题\n\n段落",
+        selection: { anchor: 0 },
+        extensions: [mdLivePreview()],
+      }),
+      parent: hostEl,
+    });
+    try {
+      await flush();
+      expect(hostEl.querySelectorAll(".cm-md-live-block").length).toBe(1);
+
+      // stub 几何：光标在标题行（y10~30），探针 y31 落进假渲染块
+      vi.spyOn(view, "coordsAtPos").mockReturnValue({ left: 10, top: 10, right: 11, bottom: 30 });
+      const fakeWidget = document.createElement("div");
+      fakeWidget.className = "cm-md-live-block";
+      fakeWidget.dataset.mdFrom = "6";
+      fakeWidget.dataset.mdTo = "8";
+      fakeWidget.appendChild(document.createElement("p"));
+      view.dom.appendChild(fakeWidget);
+      Object.defineProperty(
+        view.dom.ownerDocument,
+        "elementFromPoint",
+        { value: vi.fn().mockReturnValue(fakeWidget.firstElementChild), configurable: true },
+      );
+
+      const ev = new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true, cancelable: true });
+      view.contentDOM.dispatchEvent(ev);
+
+      // 光标进入段落块活动域 [6,8]（jsdom 零 rect → 比例映射钳到块尾边界 8）→ 段落转源码
+      const head = view.state.selection.main.head;
+      expect(head).toBeGreaterThanOrEqual(6);
+      expect(head).toBeLessThanOrEqual(8);
+      expect(ev.defaultPrevented).toBe(true);
+      fakeWidget.remove(); // 探针用完即弃，避免被下面的 widget 计数选中
+      await flush();
+      // 段落已激活：唯一渲染块变为标题
+      const remaining = hostEl.querySelectorAll<HTMLElement>(".cm-md-live-block");
+      expect(remaining.length).toBe(1);
+      expect(Number(remaining[0].dataset.mdFrom)).toBe(0);
+    } finally {
+      view.destroy();
+      hostEl.remove();
+      errSpy.mockRestore();
+      vi.restoreAllMocks();
+    }
+  });
+
+  // 探针未命中渲染块（如文档边界外）时交还原生逻辑：不得拦截（不 preventDefault 于本处理器），
+  // jsdom 中原生纵向移动行为不定义，只守「不抛错、选区不越界」。
+  it("方向键探针未命中渲染块：交还原生，不抛错", async () => {
+    const errSpy = vi.spyOn(console, "error").mockImplementation((...args: unknown[]) => {
+      crashes.push(args.map(String).join(" "));
+    });
+    const hostEl = document.createElement("div");
+    document.body.appendChild(hostEl);
+    const view = new EditorView({
+      state: EditorState.create({
+        doc: "# 标题\n\n段落",
+        selection: { anchor: 0 },
+        extensions: [mdLivePreview()],
+      }),
+      parent: hostEl,
+    });
+    try {
+      await flush();
+      vi.spyOn(view, "coordsAtPos").mockReturnValue({ left: 10, top: 10, right: 11, bottom: 30 });
+      Object.defineProperty(
+        view.dom.ownerDocument,
+        "elementFromPoint",
+        { value: vi.fn().mockReturnValue(null), configurable: true },
+      );
+      view.contentDOM.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true, cancelable: true }),
+      );
+      const head = view.state.selection.main.head;
+      expect(head).toBeGreaterThanOrEqual(0);
+      expect(head).toBeLessThanOrEqual(view.state.doc.length);
+    } finally {
+      view.destroy();
+      hostEl.remove();
+      errSpy.mockRestore();
+      vi.restoreAllMocks();
+    }
+  });
 });

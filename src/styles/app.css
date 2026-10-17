@@ -1107,6 +1107,10 @@ textarea {
 .cm-md-live-block {
   display: flow-root; /* 围合内部边距：防止 h1/p 边距逃逸出 widget 导致视觉高度≠CM 测量高度 */
   line-height: 1.5; /* 与编辑器源码行高一致（mdLivePreview 主题统一 1.5）：段落块切换高度中性 */
+  /* 编辑器 .cm-content 为 break-spaces（保留全部空白），marked 输出标签间换行会被渲染成
+     幽灵空行盒（每处 ≈ 一行高，实测单段 widget 42px vs 内容 22px）。渲染块按 HTML 排版
+     语义折叠空白（与分栏预览 .md-preview-body 一致），pre 内仍保留原文。 */
+  white-space: normal;
   padding: 0 16px; /* jsdom 挂载实测（decorations.mount.test.ts）：widget 直挂 .cm-content，不套 .cm-line，
      故 .cm-line 的 padding:0 16px 不作用于 widget，此处是唯一水平内边距，不可删（删即翻转偏移 16px） */
   color: var(--editor-text);
@@ -1167,6 +1171,7 @@ textarea {
   padding: 2px 0;
   overflow-x: auto;
   margin: 0.25em 0;
+  white-space: pre; /* 宿主 white-space:normal 会继承进 pre：代码块必须保留原文换行/缩进 */
 }
 .cm-md-live-block pre code {
   background: none;

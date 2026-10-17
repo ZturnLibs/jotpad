@@ -3,8 +3,11 @@ import { describe, expect, it } from "vitest";
 import { escapeHtml, safeUrl, sanitize } from "@/lib/md/safeHtml";
 
 describe("escapeHtml", () => {
-  it("转义 HTML 尖括号与引号", () => {
-    expect(escapeHtml(`<img src="x">&`)).toBe("&lt;img src=&quot;x&quot;&gt;&amp;");
+  it("转义 HTML 注入字符（& 与 <）", () => {
+    expect(escapeHtml(`<img src="x">&`)).toBe(`&lt;img src="x">&amp;`);
+  });
+  it("保留 >：Markdown 引用块标记依赖它", () => {
+    expect(escapeHtml("> 引用")).toBe("> 引用");
   });
 });
 

@@ -23,6 +23,12 @@ describe("renderBlockHtml", () => {
     expect(renderBlockHtml("正文 <script>alert(1)</script>")).not.toContain("<script>");
   });
 
+  it("引用块渲染为 blockquote（> 标记不被转义破坏）", () => {
+    const html = renderBlockHtml("> 引用内容");
+    expect(html).toContain("<blockquote>");
+    expect(html).not.toContain("&gt;");
+  });
+
   it("危险协议链接被剥除", () => {
     expect(renderBlockHtml("[x](javascript:alert(1))")).toContain("md-link-blocked");
   });

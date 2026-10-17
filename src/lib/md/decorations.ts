@@ -16,6 +16,7 @@ import {
   StateField,
   type EditorState,
   type Extension,
+  Prec,
   RangeSetBuilder,
 } from "@codemirror/state";
 import { type BlockInfo, parseBlocks } from "@/lib/md/blocks";
@@ -275,6 +276,43 @@ function suppressed(): boolean {
   return s.findOpen || s.replaceOpen;
 }
 
+/** 渲染块内容区几何 → 块内源码位置（点击定位与方向键激活共用的比例映射）。
+ *  取内容区（首个/末个子元素）而非 widget 整体边距，避免纵向比例偏差。 */
+function mapPointIntoBlock(
+  view: EditorView,
+  host: HTMLElement,
+  clientX: number,
+  clientY: number,
+): number {
+  const rect = host.getBoundingClientRect();
+  const first = host.firstElementChild as HTMLElement | null;
+  const last = host.lastElementChild as HTMLElement | null;
+  const contentTop = first ? first.getBoundingClientRect().top : rect.top;
+  const contentBottom = last ? last.getBoundingClientRect().bottom : rect.bottom;
+  const contentLeft = first ? first.getBoundingClientRect().left : rect.left;
+  const contentRight = last ? last.getBoundingClientRect().right : rect.right;
+  const contentH = Math.max(1, contentBottom - contentTop);
+  const contentW = Math.max(1, contentRight - contentLeft);
+
+  const bFrom = Number(host.dataset.mdFrom);
+  const bTo = Number(host.dataset.mdTo);
+  const firstLine = view.state.doc.lineAt(bFrom);
+  const lastLine = view.state.doc.lineAt(bTo);
+  const lineCount = lastLine.number - firstLine.number + 1;
+
+  const fracY = Math.min(0.999, Math.max(0, (clientY - contentTop) / contentH));
+  const targetLine = view.state.doc.line(firstLine.number + Math.floor(fracY * lineCount));
+  // 横向也按比例落到行内字符（近似；CJK/等宽差异由 clamp 兜底）
+  const fracX = Math.min(1, Math.max(0, (clientX - contentLeft) / contentW));
+  return (
+    targetLine.from +
+    Math.min(
+      targetLine.to - targetLine.from,
+      Math.round(fracX * (targetLine.to - targetLine.from)),
+    )
+  );
+}
+
 /** 渲染态链接点击 → 系统浏览器打开（经 opener 插件）；渲染块点击 → 内容区比例映射光标到块内源码行列。 */
 const mdLinkHandlers = EditorView.domEventHandlers({
   mousedown(event, view) {
@@ -297,38 +335,87 @@ const mdLinkHandlers = EditorView.domEventHandlers({
     if (!host || !view.dom.contains(host)) return false;
     // 点击渲染块：内容区比例映射到块内源码行列，光标落在点击点附近
     event.preventDefault();
-    // 内容区几何（排除 widget 自身边距，避免纵向比例偏差）
-    const rect = host.getBoundingClientRect();
-    const first = host.firstElementChild as HTMLElement | null;
-    const last = host.lastElementChild as HTMLElement | null;
-    const contentTop = first ? first.getBoundingClientRect().top : rect.top;
-    const contentBottom = last ? last.getBoundingClientRect().bottom : rect.bottom;
-    const contentLeft = first ? first.getBoundingClientRect().left : rect.left;
-    const contentRight = last ? last.getBoundingClientRect().right : rect.right;
-    const contentH = Math.max(1, contentBottom - contentTop);
-    const contentW = Math.max(1, contentRight - contentLeft);
-
-    const bFrom = Number(host.dataset.mdFrom);
-    const bTo = Number(host.dataset.mdTo);
-    const firstLine = view.state.doc.lineAt(bFrom);
-    const lastLine = view.state.doc.lineAt(bTo);
-    const lineCount = lastLine.number - firstLine.number + 1;
-
-    const fracY = Math.min(0.999, Math.max(0, (event.clientY - contentTop) / contentH));
-    const targetLine = view.state.doc.line(firstLine.number + Math.floor(fracY * lineCount));
-    // 横向也按比例落到行内字符（近似；CJK/等宽差异由 clamp 兜底）
-    const fracX = Math.min(1, Math.max(0, (event.clientX - contentLeft) / contentW));
-    const selAnchor =
-      targetLine.from +
-      Math.min(
-        targetLine.to - targetLine.from,
-        Math.round(fracX * (targetLine.to - targetLine.from)),
-      );
-
-    view.dispatch({ selection: { anchor: selAnchor } });
+    view.dispatch({ selection: { anchor: mapPointIntoBlock(view, host, event.clientX, event.clientY) } });
     return true;
   },
 });
+
+/** 渲染态纵向移动（↑↓/PgUp/PgDn 进入渲染块时激活该块）。
+ *  背景：CM6 原生纵向移动会跳过块 widget 寻找下一个文本位置（posAtCoords 的 scanY 逻辑），
+ *  而渲染态全文只有活动块是文本——下方全是渲染块时「下一个文本位置」即文档末尾（上方即
+ *  文档首），两次按键直跳首尾（estimatedHeight 只修高度估算，修不了光标语义）。
+ *  此处拦截：探测紧邻的下一视觉行是否落在渲染块内，落入则按比例映射光标进块——块即转
+ *  源码激活（M2c 渲染形下视觉近乎连续），实现逐视觉行移动；下一行仍是文本行时交还原生。
+ *  distance：0 = 紧邻一行（方向键）；>0 = 翻页探测距离（PgUp/PgDn）。
+ *  有修饰键（选区扩展/多光标等）或拿不到几何时交还原生逻辑。 */
+function moveVerticallyIntoBlock(
+  view: EditorView,
+  forward: boolean,
+  distance: number,
+): boolean {
+  const sel = view.state.selection.main;
+  if (view.state.selection.ranges.length > 1 || !sel.empty) return false;
+  const coords =
+    view.coordsAtPos(sel.head, 1) ?? view.coordsAtPos(sel.head, -1);
+  if (!coords) return false;
+  const win = view.dom.ownerDocument.defaultView;
+  if (!win) return false;
+  const probeX = coords.left + 1;
+  // 探测步长：方向键取约半行行高——posAtCoords 返回的是文本盒（含半行距），
+  // +1px 仍可能落在本行行盒内（实测空白行 bottom+1 命中自身）；半行高必落入
+  // 紧邻的下一视觉行（CM 行无间隙平铺），而块间总有可见空行带兜底。PgUp/PgDn 用翻页距。
+  const step = distance > 0 ? distance : view.defaultLineHeight * 0.55;
+  // 钳进视口：探针落点超出视口时取视口边缘（下一行在视口外/仅露边缘时按边缘块激活，
+  // 由 dispatch 的 scrollIntoView 滚入视野）
+  const probeY = Math.max(
+    2,
+    Math.min(
+      win.innerHeight - 2,
+      (forward ? coords.bottom : coords.top) + (forward ? step : -step),
+    ),
+  );
+  const el = view.dom.ownerDocument.elementFromPoint(probeX, probeY) as HTMLElement | null;
+  const host = el?.closest?.(".cm-md-live-block") as HTMLElement | null;
+  if (!host || !view.dom.contains(host)) return false;
+  view.dispatch({
+    selection: { anchor: mapPointIntoBlock(view, host, probeX, probeY) },
+    userEvent: "select",
+  });
+  return true;
+}
+
+/** 方向键/翻页键进入渲染块的激活处理（Prec.high 先于 defaultKeymap 的纵向移动）。
+ *  未命中渲染块时返回 false，交还原生行为（文本行间移动 / 文档边界无操作）。 */
+const mdArrowNav = Prec.high(
+  EditorView.domEventHandlers({
+    keydown(event, view) {
+      if (event.shiftKey || event.altKey || event.metaKey || event.ctrlKey) return false;
+      let forward: boolean;
+      let distance = 0;
+      switch (event.key) {
+        case "ArrowDown":
+          forward = true;
+          break;
+        case "ArrowUp":
+          forward = false;
+          break;
+        case "PageDown":
+          forward = true;
+          distance = view.dom.clientHeight * 0.8;
+          break;
+        case "PageUp":
+          forward = false;
+          distance = view.dom.clientHeight * 0.8;
+          break;
+        default:
+          return false;
+      }
+      if (!moveVerticallyIntoBlock(view, forward, distance)) return false;
+      event.preventDefault();
+      return true;
+    },
+  }),
+);
 
 /** 全文重算块装饰（StateField 事务内同步执行）。suppress 读 zustand：查找/替换面板
  *  开合由 Editor.tsx 派发空事务到达 update → 重算（空事务也会走到这里，路径保持有效）。 */
@@ -393,5 +480,6 @@ export function mdLivePreview(): Extension[] {
       { decorations: (v) => v.decorations },
     ),
     mdLinkHandlers,
+    mdArrowNav,
   ];
 }

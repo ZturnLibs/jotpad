@@ -1,13 +1,11 @@
 // Markdown 渲染共用的 HTML 净化：源文本转义 + 渲染结果剥离危险 URL。
 // 分栏预览与即时渲染（md live）共用，保证两条渲染链路安全行为一致。
 
-/** 转义源文本中的 HTML → marked 输出的标签全部为渲染器自产（防内容注入 HTML）。 */
+/** 转义源文本中的 HTML → marked 输出的标签全部为渲染器自产（防内容注入 HTML）。
+ *  只转义 & 与 <：无 < 即无法引入任何标签/属性，文本节点中的 > " 均为惰性字符；
+ *  > 必须保留——它是 Markdown 引用块标记（">&gt;" 会让 marked 把引用当纯文本）。 */
 export function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/[\x22]/g, "&quot;");
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;");
 }
 
 /**
