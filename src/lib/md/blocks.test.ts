@@ -48,6 +48,11 @@ describe("parseBlocks", () => {
     expect(parseBlocks("a\n\n---\n\nb")[1]).toEqual({ from: 3, to: 6, type: "hr" });
   });
 
+  it("契约：仅支持 LF（后端读取时已归一化 CRLF；含 \\r 视为段落）", () => {
+    const blocks = parseBlocks("x\r\n\r\n---\r\n\r\ny");
+    expect(blocks.every((b) => b.type === "paragraph")).toBe(true);
+  });
+
   it("setext 标题：段落 + ===/--- 升级为 heading", () => {
     // "===" 行 from 3、3 字符，按定义 to=行尾不含 \n，手工核算为 6（修正原稿的 7）
     expect(parseBlocks("标题\n===")).toEqual([{ from: 0, to: 6, type: "heading" }]);

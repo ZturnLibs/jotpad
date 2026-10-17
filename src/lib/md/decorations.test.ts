@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
-import { EditorState } from "@codemirror/state";
+import { EditorSelection, EditorState } from "@codemirror/state";
 import { buildBlockDecorations } from "@/lib/md/decorations";
 
 function stateWith(doc: string, anchor: number, head = anchor): EditorState {
@@ -27,9 +27,20 @@ describe("buildBlockDecorations", () => {
     expect(decoCount(stateWith(doc, 1))).toBe(3);
   });
 
-  it("光标在块尾行末：归下一块（该块仍渲染）", () => {
-    // 位置 4 是标题行末（"# 标题" 长 4）→ 标题应渲染，其余也渲染（无活动块）
+  it("光标在块尾行末：不属于任何块（全部渲染）", () => {
+    // 位置 4 是标题行末（"# 标题" 长 4）→ 不属于任何块，无活动块，全部渲染
     expect(decoCount(stateWith(doc, 4))).toBe(4);
+  });
+
+  it("多选区（多光标）：全部回源码（0 个装饰）", () => {
+    // Mod-d / Alt+点击产生的两个光标可能落在已渲染块内：必须全部回源码，避免盲编辑不可见文本。
+    // 多光标需 allowMultipleSelections 扩展，否则 EditorState.create 会折叠为单选区（Editor.tsx 已启用同款）。
+    const state = EditorState.create({
+      doc,
+      selection: EditorSelection.create([EditorSelection.cursor(1), EditorSelection.cursor(20)], 0),
+      extensions: [EditorState.allowMultipleSelections.of(true)],
+    });
+    expect(decoCount(state)).toBe(0);
   });
 
   it("选区跨块：全部回源码（0 个装饰）", () => {

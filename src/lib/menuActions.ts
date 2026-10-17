@@ -257,6 +257,7 @@ export function getMenuModel(): MenuModel {
     {
       id: "mdViewToggle",
       label: t("view.mdLive"),
+      ...sc("mdViewToggle"),
       checked:
         !!s.settings.experimental?.mdLive && s.settings.mdViewMode !== "source",
       disabled:

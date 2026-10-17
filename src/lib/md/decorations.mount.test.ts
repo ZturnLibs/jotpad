@@ -17,8 +17,9 @@ const crashes: string[] = [];
 
 afterEach(() => {
   // CM 的 logException 只 console.error 不抛出（插件被击杀时测试不会红），
-  // 必须显式收集才能守住「挂载不抛错」这条回归线。
+  // 必须显式收集才能守住「挂载不抛错」这条回归线；随后清空，避免增长串扰后续测试。
   expect(crashes).toEqual([]);
+  crashes.length = 0;
 });
 
 describe("mdLivePreview 挂载", () => {
@@ -49,9 +50,10 @@ describe("mdLivePreview 挂载", () => {
       await flush();
       expect(host.querySelectorAll(".cm-md-live-block").length).toBeGreaterThanOrEqual(1);
     } finally {
-      errSpy.mockRestore();
+      // 先销毁再恢复 spy：销毁期异常（若有）也要被捕获
       view.destroy();
       host.remove();
+      errSpy.mockRestore();
     }
   });
 });

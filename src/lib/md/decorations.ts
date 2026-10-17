@@ -38,7 +38,7 @@ class BlockWidget extends WidgetType {
   }
 }
 
-/** 位置所在块下标；from 闭、to 开（块尾边界归下一块）；不在任何块内返回 -1。 */
+/** 位置所在块下标；from 闭、to 开；块尾边界与块间空隙返回 -1（相邻块保持渲染）。 */
 function indexAt(blocks: BlockInfo[], pos: number, base: number): number {
   for (let i = 0; i < blocks.length; i++) {
     const from = base + blocks[i].from;
@@ -56,6 +56,8 @@ export function buildBlockDecorations(
   suppress: boolean,
 ): DecorationSet {
   if (suppress) return Decoration.none;
+  // 多光标（Mod-d / Alt+点击）可能落在已渲染块内：全部回源码，避免盲编辑不可见文本
+  if (state.selection.ranges.length > 1) return Decoration.none;
   const text = state.sliceDoc(from, to);
   const blocks = parseBlocks(text);
   if (!blocks.length) return Decoration.none;
