@@ -2,9 +2,9 @@
 import { describe, expect, it } from "vitest";
 import { EditorSelection, EditorState } from "@codemirror/state";
 import {
+  BulletWidget,
   buildBlockDecorations,
-  buildHeadingLineDecorations,
-  buildMarkerDecorations,
+  buildSourceStyling,
 } from "@/lib/md/decorations";
 import { parseBlocks } from "@/lib/md/blocks";
 
@@ -77,59 +77,112 @@ describe("buildBlockDecorations", () => {
   });
 });
 
-describe("buildHeadingLineDecorations", () => {
-  it("标题行按级别打行样式类", () => {
-    const state = EditorState.create({ doc: "# a\n\n## b\n\ntext" });
-    const decos = buildHeadingLineDecorations(state, 0, state.doc.length);
-    const classes: string[] = [];
-    decos.between(0, state.doc.length, (_f, _t, value) => {
-      classes.push((value.spec as { class?: string }).class ?? "");
-    });
-    expect(classes).toEqual(["cm-md-h1", "cm-md-h2"]);
-  });
-  it("非标题行与缩进超限不标记", () => {
-    // 4 空格缩进的 # 是代码块，不应命中（正则最多容忍 3 个前导空格）
-    const state = EditorState.create({ doc: "text\n    # indented" });
-    const decos = buildHeadingLineDecorations(state, 0, state.doc.length);
-    let count = 0;
-    decos.between(0, state.doc.length, () => {
-      count++;
-    });
-    expect(count).toBe(0);
-  });
-});
+describe("buildSourceStyling（活动块渲染态编辑）", () => {
+  /** 收集装饰区间。line=行类（零宽+class）、mark=强调色、replace=替换（可能带 widget）。 */
+  function collect(state: EditorState, suppress = false) {
+    const out: Array<{
+      from: number;
+      to: number;
+      kind: "line" | "mark" | "replace";
+      className?: string;
+      widget?: unknown;
+    }> = [];
+    buildSourceStyling(state, 0, state.doc.length, suppress).between(
+      0,
+      state.doc.length,
+      (from, to, value) => {
+        const spec = value.spec as { class?: string; widget?: unknown };
+        const kind = to > from && spec.class ? "mark" : spec.class ? "line" : "replace";
+        out.push({ from, to, kind, className: spec.class, widget: spec.widget });
+      },
+    );
+    // 不变量顺带断言：.between 按集合序遍历，from 必须非降（RangeSetBuilder 升序约束）
+    for (let i = 1; i < out.length; i++) expect(out[i].from).toBeGreaterThanOrEqual(out[i - 1].from);
+    return out;
+  }
 
-describe("buildMarkerDecorations", () => {
-  it("四类行首标记（- / > / # / 1.）标记+其后一个空格精确覆盖，普通行不标记", () => {
-    // 手算锚点："- a"(0..2,\n3) 空行(\n4) "> q"(5..7,\n8) 空行(\n9) "## h"(10..13,\n14)
-    // 空行(\n15) "1. o"(16..19,\n20) 空行(\n21) "plain"(22..26)
-    const state = EditorState.create({ doc: "- a\n\n> q\n\n## h\n\n1. o\n\nplain" });
-    const decos = buildMarkerDecorations(state, 0, state.doc.length);
-    const ranges: Array<[number, number, string]> = [];
-    decos.between(0, state.doc.length, (from, to, value) => {
-      ranges.push([from, to, (value.spec as { class?: string }).class ?? ""]);
-    });
-    expect(ranges).toEqual([
-      [0, 2, "cm-md-marker"], // "- "
-      [5, 7, "cm-md-marker"], // "> "
-      [10, 13, "cm-md-marker"], // "## "
-      [16, 19, "cm-md-marker"], // "1. "
+  it("光标在标题块：标题行类 + 零宽隐藏 '# '（无 widget）", () => {
+    // "# 标题"=0..4，段落=6..8；光标 2 在标题块内
+    const ds = collect(stateWith("# 标题\n\n段落", 2));
+    expect(ds.some((d) => d.kind === "line" && d.className === "cm-md-h1" && d.from === 0)).toBe(
+      true,
+    );
+    const rep = ds.filter((d) => d.kind === "replace");
+    expect(rep.length).toBe(1);
+    expect([rep[0].from, rep[0].to]).toEqual([0, 2]); // "# "
+    expect(rep[0].widget).toBeUndefined(); // 纯隐藏，无 widget
+  });
+
+  it("光标在列表块：'- ' → BulletWidget，标记区无强调色 mark 重叠", () => {
+    // "- 项目"=0..4，正文=7..9；光标 3 在列表块内
+    const ds = collect(stateWith("- 项目\n\n正文", 3));
+    const rep = ds.filter((d) => d.kind === "replace");
+    expect(rep.length).toBe(1);
+    expect([rep[0].from, rep[0].to]).toEqual([0, 2]); // "- "
+    expect(rep[0].widget).toBeInstanceOf(BulletWidget);
+    expect(ds.some((d) => d.kind === "mark" && d.from < 2 && d.to > 0)).toBe(false);
+  });
+
+  it("光标在其他块：列表行退回源码态强调色 mark，无替换", () => {
+    const ds = collect(stateWith("- 项目\n\n正文", 8));
+    expect(ds.some((d) => d.kind === "replace")).toBe(false);
+    const marks = ds.filter((d) => d.kind === "mark");
+    expect(marks.length).toBe(1);
+    expect(marks[0].className).toBe("cm-md-marker");
+    expect([marks[0].from, marks[0].to]).toEqual([0, 2]);
+  });
+
+  it("suppress=true：仅标题行类 + 标记强调色，无替换/引用类", () => {
+    // "# 标题"(0..4) "- 列表"(6..10) "> 引用"(12..16)
+    const doc = "# 标题\n\n- 列表\n\n> 引用";
+    const ds = collect(stateWith(doc, 2), true);
+    expect(ds.some((d) => d.kind === "replace")).toBe(false);
+    expect(ds.some((d) => d.className === "cm-md-quote" || d.className === "cm-md-codeline")).toBe(
+      false,
+    );
+    expect(
+      ds
+        .filter((d) => d.kind === "line")
+        .map((d) => d.className)
+        .filter((c) => c?.startsWith("cm-md-h")),
+    ).toEqual(["cm-md-h1"]);
+    expect(
+      ds.filter((d) => d.kind === "mark").map((d) => [d.from, d.to]),
+    ).toEqual([
+      [0, 2], // "# "
+      [6, 8], // "- "
+      [12, 14], // "> "
     ]);
   });
-  it("仅覆盖可见区间；行尾裸标记（无尾随空格）钳到行尾仍入集", () => {
-    const state = EditorState.create({ doc: "- a\n\n-\nplain" });
-    let n = 0;
-    buildMarkerDecorations(state, 0, 3).between(0, state.doc.length, () => {
-      n++;
+
+  it("多光标：无活动块（仅行类 + 强调色，不替换）", () => {
+    const doc = "# 标题\n\n- 列表\n\n> 引用";
+    const state = EditorState.create({
+      doc,
+      selection: EditorSelection.create([EditorSelection.cursor(2), EditorSelection.cursor(14)], 0),
+      extensions: [EditorState.allowMultipleSelections.of(true)],
     });
-    expect(n).toBe(1); // 视口只到第一行 → 仅 "- "
-    const ranges: Array<[number, number]> = [];
-    buildMarkerDecorations(state, 0, state.doc.length).between(0, state.doc.length, (f, t) => {
-      ranges.push([f, t]);
-    });
-    expect(ranges).toEqual([
-      [0, 2], // "- "
-      [5, 6], // 行 3 裸 "-"（m[3] 为空，钳到 line.to）
-    ]);
+    const ds = collect(state);
+    expect(ds.some((d) => d.kind === "replace")).toBe(false);
+    expect(ds.some((d) => d.className === "cm-md-quote")).toBe(false);
+    expect(ds.filter((d) => d.kind === "mark").length).toBe(3);
+  });
+
+  it("光标在引用块：隐藏 '> ' + 引用行类；代码块行仅底色（含行内 '#' 不标题化）", () => {
+    // "> 引用"(0..4) 围栏块(6..17)：```(6..9) "# c"(10..13) ```(14..17)
+    const doc = "> 引用\n\n```\n# c\n```";
+    const ds = collect(stateWith(doc, 3));
+    const rep = ds.filter((d) => d.kind === "replace");
+    expect(rep.length).toBe(1);
+    expect([rep[0].from, rep[0].to]).toEqual([0, 2]); // "> "（不含 > 前空格场景下的纯 >+空格）
+    expect(rep[0].widget).toBeUndefined();
+    expect(ds.some((d) => d.kind === "line" && d.className === "cm-md-quote" && d.from === 0)).toBe(
+      true,
+    );
+    // 代码块三行全部仅 cm-md-codeline；行内 "# c" 不再标题化/强调化（代码逐字内容）
+    const codeLines = ds.filter((d) => d.className === "cm-md-codeline").map((d) => d.from);
+    expect(codeLines).toEqual([6, 10, 14]);
+    expect(ds.some((d) => d.className === "cm-md-h1")).toBe(false);
+    expect(ds.some((d) => d.kind === "mark")).toBe(false);
   });
 });

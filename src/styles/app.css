@@ -1230,6 +1230,20 @@ textarea {
 .cm-md-marker {
   color: var(--accent);
 }
+/* 活动块渲染态编辑（M2c 一期）：标记的渲染形 */
+.cm-md-bullet {
+  display: inline-block;
+  width: 2ch;
+  color: var(--accent);
+}
+.cm-line.cm-md-quote {
+  border-left: 3px solid var(--accent);
+  padding-left: calc(16px + 2ch - 3px);
+  color: var(--text-secondary);
+}
+.cm-line.cm-md-codeline {
+  background: var(--bg-hover);
+}
 .outline-row {
   grid-template-columns: auto minmax(0, 1fr) auto;
 }

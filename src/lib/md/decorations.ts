@@ -1,5 +1,7 @@
 // 即时渲染（M1）：视口内非活动块替换为渲染 HTML；活动块（光标/选区所在）显示源码。
-// 一切编辑仍是 CM6 transaction（撤销/IME 原生）。渲染失败回退源码（renderBlockHtml → null）。
+// M2c 一期：活动块源码行再叠「渲染形」样式（buildSourceStyling）——标记隐藏/替换为
+// 渲染等价形，块切换（源码↔渲染）视觉归零。一切编辑仍是 CM6 transaction（撤销/IME 原生）。
+// 渲染失败回退源码（renderBlockHtml → null）。
 import {
   Decoration,
   type DecorationSet,
@@ -98,45 +100,123 @@ export function buildBlockDecorations(
   return builder.finish();
 }
 
-const RE_LINE_HEADING = /^ {0,3}(#{1,6})(?:\s|$)/;
-
-/** 视口内标题行 → WYSIWYG 行样式（几何与渲染态对齐，减少块切换跳动）。 */
-export function buildHeadingLineDecorations(
-  state: EditorState,
-  from: number,
-  to: number,
-): DecorationSet {
-  const builder = new RangeSetBuilder<Decoration>();
-  const first = state.doc.lineAt(from).number;
-  const last = state.doc.lineAt(to).number;
-  for (let n = first; n <= last; n++) {
-    const line = state.doc.line(n);
-    const m = RE_LINE_HEADING.exec(line.text);
-    if (!m) continue;
-    builder.add(line.from, line.from, Decoration.line({ class: `cm-md-h${m[1].length}` }));
+/** 活动块无序列表标记的渲染形：• 与渲染态 ul > li::before 同几何（宽 2ch、强调色）。 */
+export class BulletWidget extends WidgetType {
+  eq(other: BulletWidget): boolean {
+    return other instanceof BulletWidget; // 无状态：同类即等值，单实例语义即可
   }
-  return builder.finish();
+  toDOM(): HTMLElement {
+    const span = document.createElement("span");
+    span.className = "cm-md-bullet";
+    span.textContent = "•";
+    return span;
+  }
 }
 
+// 活动块「标记 → 渲染形」的行形识别：均要求标记后跟一个空白（裸标记无渲染形，走强调色）
+const RE_LINE_HEADING = /^(\s*)(#{1,6})(\s)/; // 捕获 1=前导空格 2=# 串 3=一个空白
+const RE_LINE_UL = /^(\s*)([-*+])(\s)/;
+const RE_LINE_QUOTE = /^(\s*>)(\s)/; // 捕获 1 含前导空格与 >，替换须剔除前导空格
+
+// 行首标记强调色（原 buildMarkerDecorations 语义，保留不动）
 const RE_LINE_MARKER = /^(\s*)([-*+]|#{1,6}|\d{1,9}[.)]|>)(\s?)/;
 
-/** 可见行首标记（# / - / 1. / >）上渲染强调色：源码态与渲染态颜色连续，翻转仅剩字符形差异。 */
-export function buildMarkerDecorations(
+/**
+ * 源码态「渲染形」样式（M2c 一期）：活动块（光标所在）源码行的标记替换为渲染形，
+ * 让活动块看起来已渲染——标题 "# " 零宽隐藏、"- " → •、" >" 隐藏 + 引用竖线行类、
+ * 代码块行加底色；有序列表数字保留可见（下方 cm-md-marker 强调色即其渲染形）。
+ * 非活动块行、有序数字、裸标记仍走 cm-md-marker 强调色（与旧两构建器一致）。
+ * suppress（查找面板）/ 多光标 / 跨块选区 → 无活动块，全部退回纯强调色。
+ * 单 RangeSetBuilder：严格按 from 升序零重叠——行类点（startSide=-2e8）先于
+ * 同行行内 replace/mark（startSide≈5e8）入集；replace 仅覆盖标记+一个空格，不跨行。
+ */
+export function buildSourceStyling(
   state: EditorState,
   from: number,
   to: number,
+  suppress: boolean,
 ): DecorationSet {
   const builder = new RangeSetBuilder<Decoration>();
+  const text = state.sliceDoc(from, to);
+  const blocks = parseBlocks(text);
+
+  // 活动块判定与 buildBlockDecorations 同语义：suppress / 多光标 / 跨块选区 → 无
+  let active = -1;
+  if (!suppress && state.selection.ranges.length === 1) {
+    const sel = state.selection.main;
+    const a = indexAt(blocks, sel.from, from);
+    const b = indexAt(blocks, Math.max(sel.from, sel.to - 1), from);
+    const crossBlock = sel.from !== sel.to && a !== b;
+    if (!crossBlock) active = a;
+  }
+
   const first = state.doc.lineAt(from).number;
   const last = state.doc.lineAt(to).number;
+  let bi = 0; // 行/块双指针：行号与块区间均随文档位置递增
   for (let n = first; n <= last; n++) {
     const line = state.doc.line(n);
-    const m = RE_LINE_MARKER.exec(line.text);
-    if (!m) continue;
-    const start = line.from + m[1].length;
-    // 标记 + 其后一个空格；行尾无尾随空格时钳到行尾（start<end 才入集）
-    const end = Math.min(start + m[2].length + m[3].length, line.to);
-    if (start < end) builder.add(start, end, Decoration.mark({ class: "cm-md-marker" }));
+    while (bi < blocks.length && from + blocks[bi].to < line.from) bi++;
+    const blk =
+      bi < blocks.length &&
+      line.from >= from + blocks[bi].from &&
+      line.from <= from + blocks[bi].to
+        ? blocks[bi]
+        : null;
+
+    // 代码块行：仅底色行类。代码是逐字内容，不做任何标记隐藏/强调（含行内 "#"/"-" 注释样式）
+    if (blk?.type === "code") {
+      builder.add(line.from, line.from, Decoration.line({ class: "cm-md-codeline" }));
+      continue;
+    }
+
+    const mh = RE_LINE_HEADING.exec(line.text);
+    const mu = mh ? null : RE_LINE_UL.exec(line.text);
+    const mq = mh || mu ? null : RE_LINE_QUOTE.exec(line.text);
+    const isActiveLine = blk != null && blk === blocks[active];
+
+    // 1) 行类点装饰（无条件标题类 + 活动块引用类）；点先于行内区间入集（startSide 升序合法）
+    if (mh) {
+      builder.add(
+        line.from,
+        line.from,
+        Decoration.line({ class: `cm-md-h${mh[2].length}` }),
+      );
+    }
+    if (isActiveLine && mq) {
+      builder.add(line.from, line.from, Decoration.line({ class: "cm-md-quote" }));
+    }
+
+    // 2) 行内装饰：活动块的标记替换（渲染形）与强调色 mark 二选一（单集禁重叠）
+    let replaced = false;
+    if (isActiveLine) {
+      if (mh) {
+        // 标题：零宽隐藏 "# "（从前导空格之后起，宽度与渲染态标题一致）
+        builder.add(line.from + mh[1].length, line.from + mh[0].length, Decoration.replace({}));
+        replaced = true;
+      } else if (mu) {
+        // 无序列表："- " → •（BulletWidget 与渲染态 ul::before 同几何）
+        builder.add(
+          line.from + mu[1].length,
+          line.from + mu[0].length,
+          Decoration.replace({ widget: new BulletWidget() }),
+        );
+        replaced = true;
+      } else if (mq) {
+        // 引用：隐藏 "> "（剔除前导空格），文字落点由 cm-md-quote 行类补 2ch 内边距
+        builder.add(line.from + mq[1].length - 1, line.from + mq[0].length, Decoration.replace({}));
+        replaced = true;
+      }
+      // 有序列表数字 / 裸标记：无替换，落到底部强调色分支（渲染形 = 强调色数字）
+    }
+    if (!replaced) {
+      const m = RE_LINE_MARKER.exec(line.text);
+      if (m) {
+        const start = line.from + m[1].length;
+        // 标记 + 其后一个空格；行尾无尾随空格时钳到行尾（start<end 才入集）
+        const end = Math.min(start + m[2].length + m[3].length, line.to);
+        if (start < end) builder.add(start, end, Decoration.mark({ class: "cm-md-marker" }));
+      }
+    }
   }
   return builder.finish();
 }
@@ -261,48 +341,33 @@ export function mdLivePreview(): Extension[] {
         }
       },
     ),
-    // 源码态标题行样式：行装饰可由 ViewPlugin 合法供给（多行替换禁令不适用于行装饰）；
-    // 不依赖选区，仅随文档/视口变化重建。
+    // 源码态「渲染形」样式（M2c）：依赖选区（活动块判定），随选区事务重建；
+    // 行类与行内 replace/mark 均可由 ViewPlugin 合法供给（replace 不跨行）。
+    // 查找/替换面板开合只派发空事务（Editor.tsx），doc/selection/viewport 旗标皆不变，
+    // 故额外跟踪 suppress 位变化强制重建（否则活动块的隐藏标记在查找态残留）。
     ViewPlugin.fromClass(
       class {
         decorations: DecorationSet;
+        private lastSuppress = false;
         constructor(view: EditorView) {
-          this.decorations = buildHeadingLineDecorations(
+          this.lastSuppress = suppressed();
+          this.decorations = buildSourceStyling(
             view.state,
             view.viewport.from,
             view.viewport.to,
+            this.lastSuppress,
           );
         }
         update(u: ViewUpdate) {
-          if (!u.docChanged && !u.viewportChanged) return;
-          this.decorations = buildHeadingLineDecorations(
+          const sup = suppressed();
+          if (sup === this.lastSuppress && !u.docChanged && !u.selectionSet && !u.viewportChanged)
+            return;
+          this.lastSuppress = sup;
+          this.decorations = buildSourceStyling(
             u.state,
             u.view.viewport.from,
             u.view.viewport.to,
-          );
-        }
-      },
-      { decorations: (v) => v.decorations },
-    ),
-    // 源码态行首标记强调色：mark 装饰不跨行，ViewPlugin 合法供给；
-    // 与标题行装饰分属两个插件（RangeSetBuilder 单集内禁止重叠区间，分插件最简），
-    // 同样不依赖选区，仅随文档/视口变化重建。
-    ViewPlugin.fromClass(
-      class {
-        decorations: DecorationSet;
-        constructor(view: EditorView) {
-          this.decorations = buildMarkerDecorations(
-            view.state,
-            view.viewport.from,
-            view.viewport.to,
-          );
-        }
-        update(u: ViewUpdate) {
-          if (!u.docChanged && !u.viewportChanged) return;
-          this.decorations = buildMarkerDecorations(
-            u.state,
-            u.view.viewport.from,
-            u.view.viewport.to,
+            sup,
           );
         }
       },
