@@ -35,7 +35,7 @@ class BlockWidget extends WidgetType {
     const host = document.createElement("div");
     host.className = "cm-md-live-block";
     host.innerHTML = this.html;
-    // 把块源码区间挂到 DOM 上，供 mousedown 处理器按纵向比例映射光标到块内源码行
+    // 把块源码区间挂到 DOM 上，供 mousedown 处理器按内容区比例映射光标到块内源码行列
     host.dataset.mdFrom = String(this.from);
     host.dataset.mdTo = String(this.to);
     return host;
@@ -103,7 +103,7 @@ function suppressed(): boolean {
   return s.findOpen || s.replaceOpen;
 }
 
-/** 渲染态链接点击 → 系统浏览器打开（经 opener 插件）；渲染块点击 → 光标映射到块内源码行。 */
+/** 渲染态链接点击 → 系统浏览器打开（经 opener 插件）；渲染块点击 → 内容区比例映射光标到块内源码行列。 */
 const mdLinkHandlers = EditorView.domEventHandlers({
   mousedown(event, view) {
     const anchor = (event.target as HTMLElement | null)?.closest?.("a");
@@ -123,17 +123,37 @@ const mdLinkHandlers = EditorView.domEventHandlers({
       | HTMLElement
       | null;
     if (!host || !view.dom.contains(host)) return false;
-    // 点击渲染块：按纵向比例映射到块内源码行，光标可见且所在块转源码
+    // 点击渲染块：内容区比例映射到块内源码行列，光标落在点击点附近
     event.preventDefault();
+    // 内容区几何（排除 widget 自身边距，避免纵向比例偏差）
     const rect = host.getBoundingClientRect();
+    const first = host.firstElementChild as HTMLElement | null;
+    const last = host.lastElementChild as HTMLElement | null;
+    const contentTop = first ? first.getBoundingClientRect().top : rect.top;
+    const contentBottom = last ? last.getBoundingClientRect().bottom : rect.bottom;
+    const contentLeft = first ? first.getBoundingClientRect().left : rect.left;
+    const contentRight = last ? last.getBoundingClientRect().right : rect.right;
+    const contentH = Math.max(1, contentBottom - contentTop);
+    const contentW = Math.max(1, contentRight - contentLeft);
+
     const bFrom = Number(host.dataset.mdFrom);
     const bTo = Number(host.dataset.mdTo);
     const firstLine = view.state.doc.lineAt(bFrom);
     const lastLine = view.state.doc.lineAt(bTo);
     const lineCount = lastLine.number - firstLine.number + 1;
-    const frac = rect.height > 0 ? Math.min(0.999, Math.max(0, (event.clientY - rect.top) / rect.height)) : 0;
-    const targetLine = firstLine.number + Math.floor(frac * lineCount);
-    view.dispatch({ selection: { anchor: view.state.doc.line(targetLine).from } });
+
+    const fracY = Math.min(0.999, Math.max(0, (event.clientY - contentTop) / contentH));
+    const targetLine = view.state.doc.line(firstLine.number + Math.floor(fracY * lineCount));
+    // 横向也按比例落到行内字符（近似；CJK/等宽差异由 clamp 兜底）
+    const fracX = Math.min(1, Math.max(0, (event.clientX - contentLeft) / contentW));
+    const selAnchor =
+      targetLine.from +
+      Math.min(
+        targetLine.to - targetLine.from,
+        Math.round(fracX * (targetLine.to - targetLine.from)),
+      );
+
+    view.dispatch({ selection: { anchor: selAnchor } });
     return true;
   },
 });

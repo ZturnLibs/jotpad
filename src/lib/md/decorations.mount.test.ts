@@ -81,9 +81,10 @@ describe("mdLivePreview 挂载", () => {
       const bTo = Number(el!.dataset.mdTo);
       expect(bFrom).toBe(0); // 标题块区间 0..4（dataset 携带绝对文档位置）
       expect(bTo).toBe(4);
-      // jsdom getBoundingClientRect 高度为 0 → frac 钳到 0 → 映射到块首行
+      // jsdom 所有 rect 均为 0 → contentH/W 兜底 1；clientX/Y 取内容区原点(0,0)
+      // → fracY=fracX=0 → 映射到块首行行首（若取正值会被钳到 1 → 行尾，越出块区间）
       el!.dispatchEvent(
-        new MouseEvent("mousedown", { bubbles: true, cancelable: true, clientX: 10, clientY: 10 }),
+        new MouseEvent("mousedown", { bubbles: true, cancelable: true, clientX: 0, clientY: 0 }),
       );
       const head = view.state.selection.main.head;
       expect(head).toBeGreaterThanOrEqual(bFrom);
