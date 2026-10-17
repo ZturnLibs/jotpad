@@ -153,13 +153,6 @@ export function MarkdownPreview() {
     };
   }, [active]);
 
-  useEffect(() => {
-    const iv = window.setInterval(() => {
-      document.title = `DBG active=${active} open=${open} exp=${!!experimental?.markdown} isMd=${isMd}`;
-    }, 1000);
-    return () => window.clearInterval(iv);
-  });
-
   if (!active) return null;
 
   const px = fontSize * (zoom / 100);
