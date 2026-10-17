@@ -22,16 +22,26 @@ import { type BlockInfo, parseBlocks } from "@/lib/md/blocks";
 import { renderBlockHtml } from "@/lib/md/render";
 import { useStore } from "@/store/useStore";
 
-class BlockWidget extends WidgetType {
+export class BlockWidget extends WidgetType {
   constructor(
     readonly html: string,
     readonly from: number,
     readonly to: number,
+    readonly lineCount: number,
   ) {
     super();
   }
   eq(other: BlockWidget): boolean {
-    return other.html === this.html && other.from === this.from && other.to === this.to;
+    return (
+      other.html === this.html &&
+      other.from === this.from &&
+      other.to === this.to &&
+      other.lineCount === this.lineCount
+    );
+  }
+  /** CM6 高度图估算：屏外块按源码行数估高（滚动临近后以实测替换）。 */
+  get estimatedHeight(): number {
+    return this.lineCount * 28;
   }
   toDOM(): HTMLElement {
     const host = document.createElement("div");
@@ -120,7 +130,8 @@ export function buildBlockDecorations(
   for (let i = 0; i < blocks.length; i++) {
     if (i === active) continue;
     const block = blocks[i];
-    const html = cachedRender(text.slice(block.from, block.to));
+    const slice = text.slice(block.from, block.to);
+    const html = cachedRender(slice);
     if (html == null) continue;
     // 吞掉块尾换行与块间分隔空行：间距完全由 widget 边距提供，避免「空行+边距」双重间距
     const end = ends[i];
@@ -133,7 +144,9 @@ export function buildBlockDecorations(
       from + block.from,
       from + end,
       Decoration.replace({
-        widget: new BlockWidget(html, from + block.from, from + block.to),
+        // lineCount：块源码行数（"\n" 计数 + 1）——屏外 widget 的 CM6 高度图估算
+        // （无估算则整块按约一行计高，全文装饰压塌高度图，方向键纵向移动会钳到文档末尾）
+        widget: new BlockWidget(html, from + block.from, from + block.to, slice.split("\n").length),
         block: true,
       }),
     );
@@ -339,6 +352,11 @@ const liveDecorationsField = StateField.define<DecorationSet>({
 export function mdLivePreview(): Extension[] {
   return [
     liveDecorationsField,
+    // 源码行行高与渲染块（.cm-md-live-block line-height:1.5）一致：CM 把编辑器级
+    // line-height 应用于 .cm-content/.cm-line —— 块切换（源码↔渲染）行高不变、视觉归零
+    EditorView.theme({
+      "&": { lineHeight: "1.5" },
+    }),
     EditorView.decorations.from(liveDecorationsField),
     // 原子区间防护：程序化跳转 / 拖拽选区等路径经替换块时整体跨过，不落入被吞并的隐藏区
     EditorView.atomicRanges.of((view) => view.state.field(liveDecorationsField)),

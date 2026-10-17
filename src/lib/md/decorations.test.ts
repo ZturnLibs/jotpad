@@ -2,6 +2,7 @@
 import { describe, expect, it } from "vitest";
 import { EditorSelection, EditorState } from "@codemirror/state";
 import {
+  BlockWidget,
   BulletWidget,
   buildBlockDecorations,
   buildSourceStyling,
@@ -121,6 +122,28 @@ describe("buildBlockDecorations", () => {
       expect(afterRanges[i].bFrom).toBe(beforeRanges[i].bFrom + 2); // widget dataset 区间同步位移
       expect(afterRanges[i].bTo).toBe(beforeRanges[i].bTo + 2);
     }
+  });
+
+  it("多行块 widget 提供按源码行数的高度估算（estimatedHeight = lineCount × 28）", () => {
+    // 屏外 widget 无实测高度时 CM6 以 estimatedHeight 估高；无估算则全文装饰把高度图
+    // 压塌（整块按约一行计），方向键纵向移动会钳到文档末尾。
+    const doc = "段落一\n\n- 列表甲\n- 列表乙\n- 列表丙\n\n> 引用";
+    const state = stateWith(doc, 1); // 光标在首段落 → 列表/引用两块渲染
+    const widgets: BlockWidget[] = [];
+    buildBlockDecorations(state, 0, state.doc.length, false).between(
+      0,
+      state.doc.length,
+      (_from, _to, value) => {
+        const w = value.spec.widget;
+        if (w instanceof BlockWidget) widgets.push(w);
+      },
+    );
+    expect(widgets.length).toBe(2);
+    // 列表块 3 行、引用块 1 行（手算锚点，防 parseBlocks 漂移使断言空转）
+    const list = widgets.find((w) => w.html.includes("列表丙"));
+    expect(list?.lineCount).toBe(3);
+    expect(list?.estimatedHeight).toBe(3 * 28);
+    expect(widgets.every((w) => w.estimatedHeight === w.lineCount * 28)).toBe(true);
   });
 });
 

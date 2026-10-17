@@ -1106,7 +1106,7 @@ textarea {
 /* 即时渲染块（编辑器内嵌渲染）：排版与分栏预览一致，字体继承编辑器设置 */
 .cm-md-live-block {
   display: flow-root; /* 围合内部边距：防止 h1/p 边距逃逸出 widget 导致视觉高度≠CM 测量高度 */
-  line-height: 1.7; /* 与编辑器源码行高一致：段落块切换高度中性 */
+  line-height: 1.5; /* 与编辑器源码行高一致（mdLivePreview 主题统一 1.5）：段落块切换高度中性 */
   padding: 0 16px; /* jsdom 挂载实测（decorations.mount.test.ts）：widget 直挂 .cm-content，不套 .cm-line，
      故 .cm-line 的 padding:0 16px 不作用于 widget，此处是唯一水平内边距，不可删（删即翻转偏移 16px） */
   color: var(--editor-text);
