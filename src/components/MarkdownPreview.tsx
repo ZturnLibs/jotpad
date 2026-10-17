@@ -2,73 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useStore } from "@/store/useStore";
 import { useT } from "@/lib/i18n";
 import { marked } from "marked";
-
-/** 转义源文本中的 HTML → marked 输出的标签全部为渲染器自产（防内容注入 HTML）。 */
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/[\x22]/g, "&quot;");
-}
-
-/**
- * URL 协议白名单：仅放行 http(s)/mailto/ftp、相对路径与页内锚点。
- * javascript: / data: / vbscript: 等一律剥除（防 XSS）。marked 的 URL 本身不含
- * HTML 字符，转义拦不住，必须在 href 层面过滤。
- */
-const SAFE_URL_RE = new RegExp("^(?:(?:https?|mailto|ftp):|[/#.]|\\\\..\\\\.(?:/|$)|[?#])", "i");
-
-function safeUrl(url: string): string | null {
-  const u = url.trim();
-  // 解码常见实体后判断协议（防御 href=&#106;avascript: 类绕过）
-  let probe = u;
-  try {
-    probe = probe.replace(/&#(\d+);/g, (_, d) => String.fromCharCode(+d));
-    probe = probe.replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCharCode(parseInt(h, 16)));
-    probe = probe.replace(/&amp;/gi, "&");
-  } catch {
-    /* keep raw */
-  }
-  // 任何包含冒号的非白名单协议 → 拒绝（相对路径极少含 ':'，路径中冒号仅出现在协议位）
-  if (/^[a-z][a-z0-9+.-]*:/i.test(probe) && !SAFE_URL_RE.test(probe)) return null;
-  return SAFE_URL_RE.test(probe) || !/^[a-z][a-z0-9+.-]*:/i.test(probe) ? u : null;
-}
-
-/**
- * 渲染后净化：剥离危险 href/src，保留文本内容。与 escapeHtml 双保险。
- */
-function sanitize(html: string): string {
-  const el = document.createElement("div");
-  el.innerHTML = html;
-  const walk = (node: Element) => {
-    for (const child of Array.from(node.children)) {
-      const tag = child.tagName.toLowerCase();
-      if (tag === "a") {
-        const href = child.getAttribute("href");
-        const ok = href != null && safeUrl(href) != null;
-        if (ok) {
-          child.setAttribute("href", safeUrl(href)!);
-          child.setAttribute("target", "_blank");
-          child.setAttribute("rel", "noopener noreferrer");
-        } else {
-          child.removeAttribute("href");
-          child.classList.add("md-link-blocked");
-        }
-      } else if (tag === "img") {
-        const src = child.getAttribute("src");
-        if (src == null || safeUrl(src) == null) {
-          child.removeAttribute("src");
-          child.classList.add("md-img-blocked");
-          child.setAttribute("alt", child.getAttribute("alt") ?? "⚠");
-        }
-      }
-      walk(child);
-    }
-  };
-  walk(el);
-  return el.innerHTML;
-}
+import { escapeHtml, sanitize } from "@/lib/md/safeHtml";
 
 /** 实验特性 Markdown：分栏预览。仅当 experimental.markdown 开启 + 当前 tab 是 md 文件时渲染。 */
 export function MarkdownPreview() {
