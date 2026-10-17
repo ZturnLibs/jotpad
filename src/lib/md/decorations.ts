@@ -47,14 +47,43 @@ class BlockWidget extends WidgetType {
   }
 }
 
-/** 位置所在块下标；from 闭、to 开；块尾边界与块间空隙返回 -1（相邻块保持渲染）。 */
-function indexAt(blocks: BlockInfo[], pos: number, base: number): number {
+/** 块活动域扩展终点（与替换装饰的吞并范围一致）：下一块 from（吞并块尾换行 + 分隔空行）；
+ *  末块为文本末。 */
+function extendedEnds(blocks: BlockInfo[], textLength: number): number[] {
+  return blocks.map((_, i) => (i + 1 < blocks.length ? blocks[i + 1].from : textLength));
+}
+
+/**
+ * 位置所在块下标（活动域判定）：域 = [block.from, 扩展终点)。
+ * 不变量：光标位置永不被替换装饰覆盖——分隔空行带已被前块装饰吞并，其上的插入点
+ * 必须归前块活动域（前块保持源码 → 空行可见、光标可见、上下键逐可见行移动）。
+ * 末块活动域额外含文本末位置本身（尾随空行也被吞并，文档末光标同样归末块）。
+ * 首块之前的引导空行不属于任何块（-1，全部渲染）。
+ */
+function indexAt(blocks: BlockInfo[], ends: number[], pos: number, base: number): number {
   for (let i = 0; i < blocks.length; i++) {
-    const from = base + blocks[i].from;
-    if (pos < from) return -1;
-    if (pos < base + blocks[i].to) return i;
+    if (pos < base + blocks[i].from) return -1;
+    const end = base + ends[i];
+    if (pos < end || (pos === end && i === blocks.length - 1)) return i;
   }
   return -1;
+}
+
+/** 共享活动块判定（buildBlockDecorations / buildSourceStyling 同语义）：
+ *  多光标 / 跨块选区 → null（全部回源码，避免盲编辑不可见文本）；否则活动块下标
+ *  （-1 = 不在任何块活动域）。suppress 由调用方先行短路。 */
+function activeBlock(
+  state: EditorState,
+  blocks: BlockInfo[],
+  ends: number[],
+  base: number,
+): number | null {
+  if (state.selection.ranges.length > 1) return null;
+  const sel = state.selection.main;
+  const a = indexAt(blocks, ends, sel.from, base);
+  const b = indexAt(blocks, ends, Math.max(sel.from, sel.to - 1), base);
+  if (sel.from !== sel.to && a !== b) return null; // 跨块选区
+  return a;
 }
 
 /** 纯函数：[from,to) 内的块 → 装饰集。suppress=true 时返回空（查找面板等全源码场景）。 */
@@ -70,24 +99,25 @@ export function buildBlockDecorations(
   const text = state.sliceDoc(from, to);
   const blocks = parseBlocks(text);
   if (!blocks.length) return Decoration.none;
+  const ends = extendedEnds(blocks, text.length);
 
-  const sel = state.selection.main;
-  const a = indexAt(blocks, sel.from, from);
-  const b = indexAt(blocks, Math.max(sel.from, sel.to - 1), from);
-  const crossBlock = sel.from !== sel.to && a !== b;
+  // 活动域含块后空行带：光标在分隔空行上时前块保持源码，光标永落可见区
+  const active = activeBlock(state, blocks, ends, from);
+  if (active == null) return Decoration.none;
 
   const builder = new RangeSetBuilder<Decoration>();
   for (let i = 0; i < blocks.length; i++) {
-    if (crossBlock || i === a || i === b) continue;
+    if (i === active) continue;
     const block = blocks[i];
     const html = renderBlockHtml(text.slice(block.from, block.to));
     if (html == null) continue;
     // 吞掉块尾换行与块间分隔空行：间距完全由 widget 边距提供，避免「空行+边距」双重间距
-    const end = i + 1 < blocks.length ? blocks[i + 1].from : text.length;
+    const end = ends[i];
     // block: true 让 widget 整体占有行空间：行内 replace 会与该行不可见 strut
     // （编辑器字体行高）叠加导致渲染块偏高。块装饰要求区间对齐行边界：
     // 起点即块首行行首，终点为下一块行首（吞并分隔空行后的整行边界），合法。
     // StateField 供给的块装饰不受「插件禁供块装饰」限制（CM 6.43.6）。
+    // 注意：widget 的 dataset 终点仍传原始 block.to（点击映射只落真实块行，不落空行）。
     builder.add(
       from + block.from,
       from + end,
@@ -139,16 +169,11 @@ export function buildSourceStyling(
   const builder = new RangeSetBuilder<Decoration>();
   const text = state.sliceDoc(from, to);
   const blocks = parseBlocks(text);
+  const ends = extendedEnds(blocks, text.length);
 
-  // 活动块判定与 buildBlockDecorations 同语义：suppress / 多光标 / 跨块选区 → 无
-  let active = -1;
-  if (!suppress && state.selection.ranges.length === 1) {
-    const sel = state.selection.main;
-    const a = indexAt(blocks, sel.from, from);
-    const b = indexAt(blocks, Math.max(sel.from, sel.to - 1), from);
-    const crossBlock = sel.from !== sel.to && a !== b;
-    if (!crossBlock) active = a;
-  }
+  // 活动块判定与 buildBlockDecorations 同语义（共享 activeBlock）：suppress / 多光标 /
+  // 跨块选区 → 无活动块，全部退回纯强调色；活动域同样含块后空行带。
+  const active = (suppress ? null : activeBlock(state, blocks, ends, from)) ?? -1;
 
   const first = state.doc.lineAt(from).number;
   const last = state.doc.lineAt(to).number;
@@ -310,6 +335,8 @@ export function mdLivePreview(): Extension[] {
   return [
     liveDecorationsField,
     EditorView.decorations.from(liveDecorationsField),
+    // 原子区间防护：程序化跳转 / 拖拽选区等路径经替换块时整体跨过，不落入被吞并的隐藏区
+    EditorView.atomicRanges.of((view) => view.state.field(liveDecorationsField)),
     ViewPlugin.fromClass(
       class {
         /** 上次派发的装饰集；eq 相同则不再派发，否则派发自身又触发 update 会死循环。 */
