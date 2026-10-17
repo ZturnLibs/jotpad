@@ -1106,7 +1106,7 @@ textarea {
 /* 即时渲染块（编辑器内嵌渲染）：排版与分栏预览一致，字体继承编辑器设置 */
 .cm-md-live-block {
   display: flow-root; /* 围合内部边距：防止 h1/p 边距逃逸出 widget 导致视觉高度≠CM 测量高度 */
-  line-height: 1.6;
+  line-height: 1.7; /* 与编辑器源码行高一致：段落块切换高度中性 */
   padding: 0 16px; /* 块装饰整体占有行空间后不再套 .cm-line，自带与源码行一致的水平内边距 */
   color: var(--editor-text);
 }
@@ -1116,12 +1116,15 @@ textarea {
 .cm-md-live-block h4,
 .cm-md-live-block h5,
 .cm-md-live-block h6 {
-  margin: 0.35em 0 0.15em;
   line-height: 1.25;
 }
-.cm-md-live-block h1 { font-size: 1.6em; border-bottom: 1px solid var(--border); padding-bottom: 0.2em; }
-.cm-md-live-block h2 { font-size: 1.4em; border-bottom: 1px solid var(--border); padding-bottom: 0.15em; }
-.cm-md-live-block h3 { font-size: 1.2em; }
+/* 边距逐级定义，与源码态标题行 padding 数值一一对应（几何对齐，切换不跳动） */
+.cm-md-live-block h1 { font-size: 1.6em; margin: 0.35em 0 0.15em; border-bottom: 1px solid var(--border); }
+.cm-md-live-block h2 { font-size: 1.4em; margin: 0.3em 0 0.12em; border-bottom: 1px solid var(--border); }
+.cm-md-live-block h3 { font-size: 1.2em; margin: 0.28em 0 0.1em; }
+.cm-md-live-block h4 { font-size: 1.1em; margin: 0.24em 0 0.08em; }
+.cm-md-live-block h5 { font-size: 1.05em; margin: 0.22em 0 0.06em; }
+.cm-md-live-block h6 { font-size: 1em; margin: 0.2em 0 0.05em; }
 .cm-md-live-block p { margin: 0.2em 0; }
 .cm-md-live-block ul,
 .cm-md-live-block ol { padding-left: 1.6em; margin: 0.25em 0; }
@@ -1177,6 +1180,18 @@ textarea {
   padding: 0 0.4em;
   font-size: 0.85em;
 }
+/* 源码态标题行：与渲染态几何对齐（Obsidian 式），块切换不跳动 */
+.cm-line.cm-md-h1, .cm-line.cm-md-h2, .cm-line.cm-md-h3,
+.cm-line.cm-md-h4, .cm-line.cm-md-h5, .cm-line.cm-md-h6 {
+  line-height: 1.25;
+  font-weight: 700;
+}
+.cm-line.cm-md-h1 { font-size: 1.6em; padding: 0.35em 0 0.15em; border-bottom: 1px solid var(--border); }
+.cm-line.cm-md-h2 { font-size: 1.4em; padding: 0.3em 0 0.12em; border-bottom: 1px solid var(--border); }
+.cm-line.cm-md-h3 { font-size: 1.2em; padding: 0.28em 0 0.1em; }
+.cm-line.cm-md-h4 { font-size: 1.1em; padding: 0.24em 0 0.08em; }
+.cm-line.cm-md-h5 { font-size: 1.05em; padding: 0.22em 0 0.06em; }
+.cm-line.cm-md-h6 { font-size: 1em; padding: 0.2em 0 0.05em; }
 .outline-row {
   grid-template-columns: auto minmax(0, 1fr) auto;
 }

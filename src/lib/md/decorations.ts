@@ -98,6 +98,26 @@ export function buildBlockDecorations(
   return builder.finish();
 }
 
+const RE_LINE_HEADING = /^ {0,3}(#{1,6})(?:\s|$)/;
+
+/** 视口内标题行 → WYSIWYG 行样式（几何与渲染态对齐，减少块切换跳动）。 */
+export function buildHeadingLineDecorations(
+  state: EditorState,
+  from: number,
+  to: number,
+): DecorationSet {
+  const builder = new RangeSetBuilder<Decoration>();
+  const first = state.doc.lineAt(from).number;
+  const last = state.doc.lineAt(to).number;
+  for (let n = first; n <= last; n++) {
+    const line = state.doc.line(n);
+    const m = RE_LINE_HEADING.exec(line.text);
+    if (!m) continue;
+    builder.add(line.from, line.from, Decoration.line({ class: `cm-md-h${m[1].length}` }));
+  }
+  return builder.finish();
+}
+
 function suppressed(): boolean {
   const s = useStore.getState();
   return s.findOpen || s.replaceOpen;
@@ -217,6 +237,29 @@ export function mdLivePreview(): Extension[] {
           });
         }
       },
+    ),
+    // 源码态标题行样式：行装饰可由 ViewPlugin 合法供给（多行替换禁令不适用于行装饰）；
+    // 不依赖选区，仅随文档/视口变化重建。
+    ViewPlugin.fromClass(
+      class {
+        decorations: DecorationSet;
+        constructor(view: EditorView) {
+          this.decorations = buildHeadingLineDecorations(
+            view.state,
+            view.viewport.from,
+            view.viewport.to,
+          );
+        }
+        update(u: ViewUpdate) {
+          if (!u.docChanged && !u.viewportChanged) return;
+          this.decorations = buildHeadingLineDecorations(
+            u.state,
+            u.view.viewport.from,
+            u.view.viewport.to,
+          );
+        }
+      },
+      { decorations: (v) => v.decorations },
     ),
     mdLinkHandlers,
   ];

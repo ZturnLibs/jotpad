@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
 import { EditorSelection, EditorState } from "@codemirror/state";
-import { buildBlockDecorations } from "@/lib/md/decorations";
+import { buildBlockDecorations, buildHeadingLineDecorations } from "@/lib/md/decorations";
 import { parseBlocks } from "@/lib/md/blocks";
 
 function stateWith(doc: string, anchor: number, head = anchor): EditorState {
@@ -70,5 +70,27 @@ describe("buildBlockDecorations", () => {
     expect(rangeEnd).toBe(expected);
     // 手算锚点：# 标题(0..3) + 4 个 \n(4..7) → 段落 from=8（防止 parseBlocks 漂移使断言空转）
     expect(expected).toBe(8);
+  });
+});
+
+describe("buildHeadingLineDecorations", () => {
+  it("标题行按级别打行样式类", () => {
+    const state = EditorState.create({ doc: "# a\n\n## b\n\ntext" });
+    const decos = buildHeadingLineDecorations(state, 0, state.doc.length);
+    const classes: string[] = [];
+    decos.between(0, state.doc.length, (_f, _t, value) => {
+      classes.push((value.spec as { class?: string }).class ?? "");
+    });
+    expect(classes).toEqual(["cm-md-h1", "cm-md-h2"]);
+  });
+  it("非标题行与缩进超限不标记", () => {
+    // 4 空格缩进的 # 是代码块，不应命中（正则最多容忍 3 个前导空格）
+    const state = EditorState.create({ doc: "text\n    # indented" });
+    const decos = buildHeadingLineDecorations(state, 0, state.doc.length);
+    let count = 0;
+    decos.between(0, state.doc.length, () => {
+      count++;
+    });
+    expect(count).toBe(0);
   });
 });
