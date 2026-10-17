@@ -56,4 +56,49 @@ describe("mdLivePreview 挂载", () => {
       errSpy.mockRestore();
     }
   });
+
+  it("点击渲染块：光标落入对应块内源码", async () => {
+    const errSpy = vi.spyOn(console, "error").mockImplementation((...args: unknown[]) => {
+      crashes.push(args.map(String).join(" "));
+    });
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const doc = "# 标题\n\n段落";
+    const view = new EditorView({
+      state: EditorState.create({
+        doc,
+        // 光标初始在段落（6..8）→ 标题（0..4）渲染
+        selection: { anchor: 7 },
+        extensions: [mdLivePreview()],
+      }),
+      parent: host,
+    });
+    try {
+      await flush();
+      const el = host.querySelector<HTMLElement>(".cm-md-live-block");
+      expect(el).not.toBeNull();
+      const bFrom = Number(el!.dataset.mdFrom);
+      const bTo = Number(el!.dataset.mdTo);
+      expect(bFrom).toBe(0); // 标题块区间 0..4（dataset 携带绝对文档位置）
+      expect(bTo).toBe(4);
+      // jsdom getBoundingClientRect 高度为 0 → frac 钳到 0 → 映射到块首行
+      el!.dispatchEvent(
+        new MouseEvent("mousedown", { bubbles: true, cancelable: true, clientX: 10, clientY: 10 }),
+      );
+      const head = view.state.selection.main.head;
+      expect(head).toBeGreaterThanOrEqual(bFrom);
+      expect(head).toBeLessThanOrEqual(bTo);
+      expect(head).toBe(0); // 块首行行首
+      await flush();
+      // 光标已进标题块 → 标题转源码；此时渲染的是另一个块（段落 6..8），且不再是被点击的标题
+      const remaining = host.querySelectorAll<HTMLElement>(".cm-md-live-block");
+      expect(remaining.length).toBe(1);
+      expect(Number(remaining[0].dataset.mdFrom)).toBe(6);
+      expect(Number(remaining[0].dataset.mdTo)).toBe(8);
+    } finally {
+      view.destroy();
+      host.remove();
+      errSpy.mockRestore();
+    }
+  });
 });

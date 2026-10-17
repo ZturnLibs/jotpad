@@ -21,16 +21,23 @@ import { renderBlockHtml } from "@/lib/md/render";
 import { useStore } from "@/store/useStore";
 
 class BlockWidget extends WidgetType {
-  constructor(readonly html: string) {
+  constructor(
+    readonly html: string,
+    readonly from: number,
+    readonly to: number,
+  ) {
     super();
   }
   eq(other: BlockWidget): boolean {
-    return other.html === this.html;
+    return other.html === this.html && other.from === this.from && other.to === this.to;
   }
   toDOM(): HTMLElement {
     const host = document.createElement("div");
     host.className = "cm-md-live-block";
     host.innerHTML = this.html;
+    // 把块源码区间挂到 DOM 上，供 mousedown 处理器按纵向比例映射光标到块内源码行
+    host.dataset.mdFrom = String(this.from);
+    host.dataset.mdTo = String(this.to);
     return host;
   }
   ignoreEvent(): boolean {
@@ -76,7 +83,7 @@ export function buildBlockDecorations(
     builder.add(
       from + block.from,
       from + block.to,
-      Decoration.replace({ widget: new BlockWidget(html) }),
+      Decoration.replace({ widget: new BlockWidget(html, from + block.from, from + block.to) }),
     );
   }
   return builder.finish();
@@ -87,19 +94,37 @@ function suppressed(): boolean {
   return s.findOpen || s.replaceOpen;
 }
 
-/** 渲染态链接点击 → 系统浏览器打开（经 opener 插件）。 */
+/** 渲染态链接点击 → 系统浏览器打开（经 opener 插件）；渲染块点击 → 光标映射到块内源码行。 */
 const mdLinkHandlers = EditorView.domEventHandlers({
   mousedown(event, view) {
     const anchor = (event.target as HTMLElement | null)?.closest?.("a");
-    if (!anchor || !view.dom.contains(anchor)) return false;
-    const href = anchor.getAttribute("href");
-    if (!href) return false;
+    if (anchor && view.dom.contains(anchor)) {
+      const href = anchor.getAttribute("href");
+      if (href) {
+        event.preventDefault();
+        void import("@tauri-apps/plugin-opener")
+          .then(({ openUrl }) => openUrl(href))
+          .catch(() => {
+            /* 打不开则忽略 */
+          });
+        return true;
+      }
+    }
+    const host = (event.target as HTMLElement | null)?.closest?.(".cm-md-live-block") as
+      | HTMLElement
+      | null;
+    if (!host || !view.dom.contains(host)) return false;
+    // 点击渲染块：按纵向比例映射到块内源码行，光标可见且所在块转源码
     event.preventDefault();
-    void import("@tauri-apps/plugin-opener")
-      .then(({ openUrl }) => openUrl(href))
-      .catch(() => {
-        /* 打不开则忽略 */
-      });
+    const rect = host.getBoundingClientRect();
+    const bFrom = Number(host.dataset.mdFrom);
+    const bTo = Number(host.dataset.mdTo);
+    const firstLine = view.state.doc.lineAt(bFrom);
+    const lastLine = view.state.doc.lineAt(bTo);
+    const lineCount = lastLine.number - firstLine.number + 1;
+    const frac = rect.height > 0 ? Math.min(0.999, Math.max(0, (event.clientY - rect.top) / rect.height)) : 0;
+    const targetLine = firstLine.number + Math.floor(frac * lineCount);
+    view.dispatch({ selection: { anchor: view.state.doc.line(targetLine).from } });
     return true;
   },
 });

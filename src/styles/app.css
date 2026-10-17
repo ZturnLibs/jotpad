@@ -1105,6 +1105,7 @@ textarea {
 }
 /* 即时渲染块（编辑器内嵌渲染）：排版与分栏预览一致，字体继承编辑器设置 */
 .cm-md-live-block {
+  display: flow-root; /* 围合内部边距：防止 h1/p 边距逃逸出 widget 导致视觉高度≠CM 测量高度 */
   line-height: 1.7;
   color: var(--editor-text);
 }
@@ -1114,15 +1115,15 @@ textarea {
 .cm-md-live-block h4,
 .cm-md-live-block h5,
 .cm-md-live-block h6 {
-  margin: 1em 0 0.4em;
+  margin: 0.3em 0 0.15em;
   line-height: 1.3;
 }
 .cm-md-live-block h1 { font-size: 1.6em; border-bottom: 1px solid var(--border); padding-bottom: 0.3em; }
 .cm-md-live-block h2 { font-size: 1.4em; border-bottom: 1px solid var(--border); padding-bottom: 0.25em; }
 .cm-md-live-block h3 { font-size: 1.2em; }
-.cm-md-live-block p { margin: 0.5em 0; }
+.cm-md-live-block p { margin: 0.15em 0; }
 .cm-md-live-block ul,
-.cm-md-live-block ol { padding-left: 1.6em; margin: 0.5em 0; }
+.cm-md-live-block ol { padding-left: 1.6em; margin: 0.2em 0; }
 .cm-md-live-block code {
   font-size: 0.9em;
   background: var(--bg-hover);
@@ -1134,25 +1135,25 @@ textarea {
   border-radius: var(--radius);
   padding: 10px 12px;
   overflow-x: auto;
-  margin: 0.6em 0;
+  margin: 0.25em 0;
 }
 .cm-md-live-block pre code {
   background: none;
   padding: 0;
 }
 .cm-md-live-block blockquote {
-  margin: 0.6em 0;
+  margin: 0.2em 0;
   padding: 0.2em 1em;
   border-left: 3px solid var(--accent);
   color: var(--text-secondary);
 }
-.cm-md-live-block table { border-collapse: collapse; margin: 0.6em 0; }
+.cm-md-live-block table { border-collapse: collapse; margin: 0.25em 0; }
 .cm-md-live-block th,
 .cm-md-live-block td { border: 1px solid var(--border-strong); padding: 4px 10px; }
 .cm-md-live-block th { background: var(--bg-hover); }
 .cm-md-live-block img { max-width: 100%; }
 .cm-md-live-block a { color: var(--accent); }
-.cm-md-live-block hr { border: none; border-top: 1px solid var(--border); margin: 1em 0; }
+.cm-md-live-block hr { border: none; border-top: 1px solid var(--border); margin: 0.35em 0; }
 .cm-md-live-block input[type="checkbox"] {
   margin-right: 0.45em;
   accent-color: var(--accent);
