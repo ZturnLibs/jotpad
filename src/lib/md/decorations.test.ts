@@ -1,7 +1,11 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
 import { EditorSelection, EditorState } from "@codemirror/state";
-import { buildBlockDecorations, buildHeadingLineDecorations } from "@/lib/md/decorations";
+import {
+  buildBlockDecorations,
+  buildHeadingLineDecorations,
+  buildMarkerDecorations,
+} from "@/lib/md/decorations";
 import { parseBlocks } from "@/lib/md/blocks";
 
 function stateWith(doc: string, anchor: number, head = anchor): EditorState {
@@ -92,5 +96,40 @@ describe("buildHeadingLineDecorations", () => {
       count++;
     });
     expect(count).toBe(0);
+  });
+});
+
+describe("buildMarkerDecorations", () => {
+  it("四类行首标记（- / > / # / 1.）标记+其后一个空格精确覆盖，普通行不标记", () => {
+    // 手算锚点："- a"(0..2,\n3) 空行(\n4) "> q"(5..7,\n8) 空行(\n9) "## h"(10..13,\n14)
+    // 空行(\n15) "1. o"(16..19,\n20) 空行(\n21) "plain"(22..26)
+    const state = EditorState.create({ doc: "- a\n\n> q\n\n## h\n\n1. o\n\nplain" });
+    const decos = buildMarkerDecorations(state, 0, state.doc.length);
+    const ranges: Array<[number, number, string]> = [];
+    decos.between(0, state.doc.length, (from, to, value) => {
+      ranges.push([from, to, (value.spec as { class?: string }).class ?? ""]);
+    });
+    expect(ranges).toEqual([
+      [0, 2, "cm-md-marker"], // "- "
+      [5, 7, "cm-md-marker"], // "> "
+      [10, 13, "cm-md-marker"], // "## "
+      [16, 19, "cm-md-marker"], // "1. "
+    ]);
+  });
+  it("仅覆盖可见区间；行尾裸标记（无尾随空格）钳到行尾仍入集", () => {
+    const state = EditorState.create({ doc: "- a\n\n-\nplain" });
+    let n = 0;
+    buildMarkerDecorations(state, 0, 3).between(0, state.doc.length, () => {
+      n++;
+    });
+    expect(n).toBe(1); // 视口只到第一行 → 仅 "- "
+    const ranges: Array<[number, number]> = [];
+    buildMarkerDecorations(state, 0, state.doc.length).between(0, state.doc.length, (f, t) => {
+      ranges.push([f, t]);
+    });
+    expect(ranges).toEqual([
+      [0, 2], // "- "
+      [5, 6], // 行 3 裸 "-"（m[3] 为空，钳到 line.to）
+    ]);
   });
 });

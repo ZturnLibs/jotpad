@@ -1140,6 +1140,7 @@ textarea {
   content: "•";
   display: inline-block;
   width: 2ch;
+  color: var(--accent);
 }
 .cm-md-live-block ol > li::before {
   content: counter(li) ".";
@@ -1147,14 +1148,20 @@ textarea {
   display: inline-block;
   width: 3ch;
   text-align: right;
+  color: var(--accent);
 }
+/* 行内代码几何归一：编辑器上下文无 --md-family，code/pre 若用 UA 默认 monospace/0.9em
+   会换字体变字宽 → 渲染态折行点与源码态漂移 → 翻转高度跳动。继承编辑器字体、1em。
+   （分栏预览 .md-preview-body 不改：它有 --md-family，且不参与块内翻转。） */
 .cm-md-live-block code {
-  font-size: 0.9em;
+  font-family: inherit;
+  font-size: 1em;
   background: var(--bg-hover);
   border-radius: 4px;
   padding: 0.1em 0.35em;
 }
 .cm-md-live-block pre {
+  font-family: inherit;
   background: var(--bg-hover);
   border-radius: var(--radius);
   padding: 2px 0;
@@ -1219,6 +1226,10 @@ textarea {
 .cm-line.cm-md-h4 { font-size: 1.1em; padding: 0.24em 0 0.08em; }
 .cm-line.cm-md-h5 { font-size: 1.05em; padding: 0.22em 0 0.06em; }
 .cm-line.cm-md-h6 { font-size: 1em; padding: 0.2em 0 0.05em; }
+/* 源码态行首标记：与渲染态标记（•/1./引用边框）同色，翻转颜色连续，仅剩字符形差异 */
+.cm-md-marker {
+  color: var(--accent);
+}
 .outline-row {
   grid-template-columns: auto minmax(0, 1fr) auto;
 }

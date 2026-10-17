@@ -118,6 +118,29 @@ export function buildHeadingLineDecorations(
   return builder.finish();
 }
 
+const RE_LINE_MARKER = /^(\s*)([-*+]|#{1,6}|\d{1,9}[.)]|>)(\s?)/;
+
+/** 可见行首标记（# / - / 1. / >）上渲染强调色：源码态与渲染态颜色连续，翻转仅剩字符形差异。 */
+export function buildMarkerDecorations(
+  state: EditorState,
+  from: number,
+  to: number,
+): DecorationSet {
+  const builder = new RangeSetBuilder<Decoration>();
+  const first = state.doc.lineAt(from).number;
+  const last = state.doc.lineAt(to).number;
+  for (let n = first; n <= last; n++) {
+    const line = state.doc.line(n);
+    const m = RE_LINE_MARKER.exec(line.text);
+    if (!m) continue;
+    const start = line.from + m[1].length;
+    // 标记 + 其后一个空格；行尾无尾随空格时钳到行尾（start<end 才入集）
+    const end = Math.min(start + m[2].length + m[3].length, line.to);
+    if (start < end) builder.add(start, end, Decoration.mark({ class: "cm-md-marker" }));
+  }
+  return builder.finish();
+}
+
 function suppressed(): boolean {
   const s = useStore.getState();
   return s.findOpen || s.replaceOpen;
@@ -253,6 +276,30 @@ export function mdLivePreview(): Extension[] {
         update(u: ViewUpdate) {
           if (!u.docChanged && !u.viewportChanged) return;
           this.decorations = buildHeadingLineDecorations(
+            u.state,
+            u.view.viewport.from,
+            u.view.viewport.to,
+          );
+        }
+      },
+      { decorations: (v) => v.decorations },
+    ),
+    // 源码态行首标记强调色：mark 装饰不跨行，ViewPlugin 合法供给；
+    // 与标题行装饰分属两个插件（RangeSetBuilder 单集内禁止重叠区间，分插件最简），
+    // 同样不依赖选区，仅随文档/视口变化重建。
+    ViewPlugin.fromClass(
+      class {
+        decorations: DecorationSet;
+        constructor(view: EditorView) {
+          this.decorations = buildMarkerDecorations(
+            view.state,
+            view.viewport.from,
+            view.viewport.to,
+          );
+        }
+        update(u: ViewUpdate) {
+          if (!u.docChanged && !u.viewportChanged) return;
+          this.decorations = buildMarkerDecorations(
             u.state,
             u.view.viewport.from,
             u.view.viewport.to,
