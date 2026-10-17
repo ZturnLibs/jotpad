@@ -82,10 +82,17 @@ export function buildBlockDecorations(
     if (html == null) continue;
     // 吞掉块尾换行与块间分隔空行：间距完全由 widget 边距提供，避免「空行+边距」双重间距
     const end = i + 1 < blocks.length ? blocks[i + 1].from : text.length;
+    // block: true 让 widget 整体占有行空间：行内 replace 会与该行不可见 strut
+    // （编辑器字体行高）叠加导致渲染块偏高。块装饰要求区间对齐行边界：
+    // 起点即块首行行首，终点为下一块行首（吞并分隔空行后的整行边界），合法。
+    // StateField 供给的块装饰不受「插件禁供块装饰」限制（CM 6.43.6）。
     builder.add(
       from + block.from,
       from + end,
-      Decoration.replace({ widget: new BlockWidget(html, from + block.from, from + block.to) }),
+      Decoration.replace({
+        widget: new BlockWidget(html, from + block.from, from + block.to),
+        block: true,
+      }),
     );
   }
   return builder.finish();
