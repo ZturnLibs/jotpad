@@ -89,6 +89,39 @@ describe("buildBlockDecorations", () => {
     // 手算锚点：# 标题(0..3) + 4 个 \n(4..7) → 段落 from=8（防止 parseBlocks 漂移使断言空转）
     expect(expected).toBe(8);
   });
+
+  it("文档编辑后装饰纯由 state 重算：区间随插入位移（无异步/映射残留）", () => {
+    // StateField 现在每事务从 tr.state 全文同步重算：编辑事务后的 state 直接给出
+    // 位移后的装饰区间，widget 的 dataset 区间同样落在新块边界（点击映射不漂移）。
+    // 文档以段落开头（活动块），头部插入不改变后续块的结构/类型，仅整体位移 +2
+    const doc = "段落甲\n\n# 标题\n\n> 引用";
+    const before = stateWith(doc, 1); // 光标在首段落 → 标题/引用渲染
+    const tr = before.update({ changes: { from: 0, insert: "！！" } }); // 头部插 2 字符
+    expect(tr.state.doc).not.toBe(before.doc); // 确实发生了文档变更
+
+    const rangesOf = (state: EditorState) => {
+      const out: Array<{ from: number; to: number; bFrom: number; bTo: number }> = [];
+      buildBlockDecorations(state, 0, state.doc.length, false).between(
+        0,
+        state.doc.length,
+        (from, to, value) => {
+          const w = value.spec.widget as { from: number; to: number };
+          out.push({ from, to, bFrom: w.from, bTo: w.to });
+        },
+      );
+      return out;
+    };
+    const beforeRanges = rangesOf(before);
+    const afterRanges = rangesOf(tr.state);
+    expect(beforeRanges.length).toBe(2); // 标题 + 引用（列表场景之外的稳定双块）
+    expect(afterRanges.length).toBe(2); // 块结构不变 → 装饰条数不变
+    for (let i = 0; i < 2; i++) {
+      expect(afterRanges[i].from).toBe(beforeRanges[i].from + 2); // 替换区间整体 +2
+      expect(afterRanges[i].to).toBe(beforeRanges[i].to + 2);
+      expect(afterRanges[i].bFrom).toBe(beforeRanges[i].bFrom + 2); // widget dataset 区间同步位移
+      expect(afterRanges[i].bTo).toBe(beforeRanges[i].bTo + 2);
+    }
+  });
 });
 
 describe("buildSourceStyling（活动块渲染态编辑）", () => {

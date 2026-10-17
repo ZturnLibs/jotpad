@@ -1,4 +1,6 @@
-// 即时渲染（M1）：视口内非活动块替换为渲染 HTML；活动块（光标/选区所在）显示源码。
+// 即时渲染（M1）：非活动块替换为渲染 HTML；活动块（光标/选区所在）显示源码。
+// 块装饰由 StateField 在事务内同步计算（全文范围 + 渲染 HTML 记忆化）：选区/编辑事务
+// 提交时装饰即与几何同步定型，方向键等光标移动不存在「选区已动、装饰后到」的异步空窗。
 // M2c 一期：活动块源码行再叠「渲染形」样式（buildSourceStyling）——标记隐藏/替换为
 // 渲染等价形，块切换（源码↔渲染）视觉归零。一切编辑仍是 CM6 transaction（撤销/IME 原生）。
 // 渲染失败回退源码（renderBlockHtml → null）。
@@ -11,11 +13,9 @@ import {
   WidgetType,
 } from "@codemirror/view";
 import {
-  StateEffect,
   StateField,
   type EditorState,
   type Extension,
-  RangeSet,
   RangeSetBuilder,
 } from "@codemirror/state";
 import { type BlockInfo, parseBlocks } from "@/lib/md/blocks";
@@ -86,6 +86,17 @@ function activeBlock(
   return a;
 }
 
+/** 块文本 → 渲染 HTML 记忆化：全文重算只对变更块真正调 marked。超上限整体清空（简单防膨胀）。 */
+const renderCache = new Map<string, string | null>();
+const RENDER_CACHE_MAX = 500;
+function cachedRender(text: string): string | null {
+  if (!renderCache.has(text)) {
+    if (renderCache.size >= RENDER_CACHE_MAX) renderCache.clear();
+    renderCache.set(text, renderBlockHtml(text));
+  }
+  return renderCache.get(text) ?? null;
+}
+
 /** 纯函数：[from,to) 内的块 → 装饰集。suppress=true 时返回空（查找面板等全源码场景）。 */
 export function buildBlockDecorations(
   state: EditorState,
@@ -109,7 +120,7 @@ export function buildBlockDecorations(
   for (let i = 0; i < blocks.length; i++) {
     if (i === active) continue;
     const block = blocks[i];
-    const html = renderBlockHtml(text.slice(block.from, block.to));
+    const html = cachedRender(text.slice(block.from, block.to));
     if (html == null) continue;
     // 吞掉块尾换行与块间分隔空行：间距完全由 widget 边距提供，避免「空行+边距」双重间距
     const end = ends[i];
@@ -306,68 +317,31 @@ const mdLinkHandlers = EditorView.domEventHandlers({
   },
 });
 
-/** 视口装饰集的搬运通道：ViewPlugin 算出集后经此效果写入下方 StateField。 */
-const setLiveDecorations = StateEffect.define<DecorationSet>();
+/** 全文重算块装饰（StateField 事务内同步执行）。suppress 读 zustand：查找/替换面板
+ *  开合由 Editor.tsx 派发空事务到达 update → 重算（空事务也会走到这里，路径保持有效）。 */
+function compute(state: EditorState): DecorationSet {
+  return buildBlockDecorations(state, 0, state.doc.length, suppressed());
+}
 
 /**
- * 装饰必须经 StateField 静态供给：CM6 禁止 ViewPlugin 提供跨行替换/块装饰
- * （RangeError: Decorations that replace line breaks may not be specified via plugins）。
- * 效果到达取效果值；无效果而文档已变时映射旧集，保证两次事务之间不持有过期区间。
+ * 块装饰在事务内同步计算（全文 + 渲染记忆化）：选区/编辑事务提交时装饰即定型，
+ * 方向键等纵向移动读取的高度图与选区同帧一致，不存在「选区已动、装饰后到」的空窗
+ * （旧实现 ViewPlugin → queueMicrotask → effect 异步落地，快速按键时 CM 读到过期几何）。
+ * CM6 要求跨行替换/块装饰经 StateField 静态供给（插件禁供），此字段即唯一供给方。
  */
 const liveDecorationsField = StateField.define<DecorationSet>({
-  create: () => Decoration.none,
-  update(value, tr) {
-    let next = value;
-    let has = false;
-    for (const e of tr.effects) {
-      if (e.is(setLiveDecorations)) {
-        next = e.value;
-        has = true;
-      }
-    }
-    if (!has && tr.docChanged) return value.map(tr.changes);
-    return next;
-  },
+  create: (state) => compute(state),
+  update: (_v, tr) => compute(tr.state),
 });
 
-/** 挂到编辑器扩展集。ViewPlugin 负责视口/抑制态检测并经 effect 派发（保留视口窗口化）。 */
+/** 挂到编辑器扩展集。块装饰随每事务全文同步重算（cachedRender 记忆化控制成本）；
+ *  源码形样式（buildSourceStyling）仍由 ViewPlugin 按视口供给。 */
 export function mdLivePreview(): Extension[] {
   return [
     liveDecorationsField,
     EditorView.decorations.from(liveDecorationsField),
     // 原子区间防护：程序化跳转 / 拖拽选区等路径经替换块时整体跨过，不落入被吞并的隐藏区
     EditorView.atomicRanges.of((view) => view.state.field(liveDecorationsField)),
-    ViewPlugin.fromClass(
-      class {
-        /** 上次派发的装饰集；eq 相同则不再派发，否则派发自身又触发 update 会死循环。 */
-        private last = Decoration.none;
-        constructor(view: EditorView) {
-          this.sync(view);
-        }
-        update(u: ViewUpdate) {
-          this.sync(u.view);
-        }
-        /**
-         * 重算视口装饰并派发。不能同步 view.dispatch：CM 6.43.6 在更新进行中调用
-         * update 会抛错，且该异常会被 CM 捕获后直接击杀本插件；故经微任务在
-         * 更新周期结束后派发（CM 自身对延迟派发亦用同款微任务模式）。
-         */
-        private sync(view: EditorView) {
-          const set = buildBlockDecorations(
-            view.state,
-            view.viewport.from,
-            view.viewport.to,
-            suppressed(),
-          );
-          // RangeSet 无实例 eq，用静态 RangeSet.eq 全区间比较（widget 经 BlockWidget.eq）
-          if (RangeSet.eq([this.last], [set])) return;
-          this.last = set;
-          queueMicrotask(() => {
-            view.dispatch({ effects: setLiveDecorations.of(set) });
-          });
-        }
-      },
-    ),
     // 源码态「渲染形」样式（M2c）：依赖选区（活动块判定），随选区事务重建；
     // 行类与行内 replace/mark 均可由 ViewPlugin 合法供给（replace 不跨行）。
     // 查找/替换面板开合只派发空事务（Editor.tsx），doc/selection/viewport 旗标皆不变，
