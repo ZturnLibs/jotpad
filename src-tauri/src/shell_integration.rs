@@ -143,10 +143,10 @@ pub fn enqueue_open_paths(app: &AppHandle, paths: Vec<String>) {
     let _ = app.emit("open-paths", paths);
 }
 
-/// Parse argv / CLI for file paths and `--new-in <dir>`.
-pub fn collect_launch_paths() -> Vec<String> {
+/// Parse launch args (excluding argv[0]) for file paths and `--new-in <dir>`.
+pub fn parse_launch_args<I: IntoIterator<Item = String>>(args: I) -> Vec<String> {
     let mut files = Vec::new();
-    let mut args = std::env::args().skip(1).peekable();
+    let mut args = args.into_iter().peekable();
     while let Some(arg) = args.next() {
         if arg == "--new-in" {
             if let Some(dir) = args.next() {
@@ -172,6 +172,11 @@ pub fn collect_launch_paths() -> Vec<String> {
         }
     }
     files
+}
+
+/// Parse argv / CLI for file paths and `--new-in <dir>`.
+pub fn collect_launch_paths() -> Vec<String> {
+    parse_launch_args(std::env::args().skip(1))
 }
 
 /// Create an uniquely named empty text file in `dir`.

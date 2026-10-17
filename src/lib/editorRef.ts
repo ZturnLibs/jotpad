@@ -20,6 +20,21 @@ export function setEditorView(v: EditorView | null): void {
   view = v;
 }
 
+/** 程序化整体替换文档期间的深度标记；Editor 的 updateListener 借此不把替换计入用户修改（dirty）。 */
+let programmaticDocDepth = 0;
+
+export function beginProgrammaticDocChange(): void {
+  programmaticDocDepth += 1;
+}
+
+export function endProgrammaticDocChange(): void {
+  programmaticDocDepth = Math.max(0, programmaticDocDepth - 1);
+}
+
+export function isProgrammaticDocChange(): boolean {
+  return programmaticDocDepth > 0;
+}
+
 export function getEditorView(): EditorView | null {
   return view;
 }

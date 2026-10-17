@@ -15,7 +15,7 @@ import type {
 import { DEFAULT_SETTINGS } from "@/types";
 import * as api from "@/lib/backend";
 import { basename, dirname, joinPath } from "@/lib/backend";
-import { getEditorView } from "@/lib/editorRef";
+import { getEditorView, beginProgrammaticDocChange, endProgrammaticDocChange } from "@/lib/editorRef";
 import { diffLines } from "@/lib/diff";
 import { translate } from "@/lib/i18n";
 import { dismissToast, showToast, updateToast } from "@/lib/toast";
@@ -43,6 +43,19 @@ const SELF_WRITE_GRACE_MS = 4000;
 const recentSelfWrites = new Map<string, number>();
 /** 原生打开/保存对话框打开期间，暂停外部变更检测（避免失焦误报）。 */
 let nativeFileDialogDepth = 0;
+/** 编辑/标签变化后防抖落盘间隔：崩溃或被强退也能恢复草稿与最新 mtime 基准。 */
+const PERSIST_DEBOUNCE_MS = 2000;
+
+let persistTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** 防抖持久化：高频编辑只触发一次落盘。 */
+function schedulePersist(): void {
+  if (persistTimer != null) clearTimeout(persistTimer);
+  persistTimer = setTimeout(() => {
+    persistTimer = null;
+    void useStore.getState().persist();
+  }, PERSIST_DEBOUNCE_MS);
+}
 
 function markSelfWrite(path: string): void {
   recentSelfWrites.set(path, Date.now());
@@ -298,9 +311,14 @@ function applyDocToEditor(text: string): void {
   if (!view) return;
   const current = view.state.doc.toString();
   if (current === text) return;
-  view.dispatch({
-    changes: { from: 0, to: current.length, insert: text },
-  });
+  beginProgrammaticDocChange();
+  try {
+    view.dispatch({
+      changes: { from: 0, to: current.length, insert: text },
+    });
+  } finally {
+    endProgrammaticDocChange();
+  }
 }
 
 async function loadTabFromPath(path: string): Promise<TabState | null> {
@@ -394,15 +412,36 @@ export const useStore = create<Store>((set, get) => ({
         activeTabId,
         settings,
         recentFiles,
+        pinnedPaths,
         sessions,
         ready: true,
       });
       void get().refreshVoicePack();
       for (const tab of tabs) {
-        if (!tab.filePath || tab.diskMtimeMs != null) continue;
+        if (!tab.filePath) continue;
         try {
           const m = await api.fileMtime(tab.filePath);
-          get().updateTab(tab.id, { diskMtimeMs: m });
+          if (m === tab.diskMtimeMs) continue;
+          if (tab.diskMtimeMs == null) {
+            get().updateTab(tab.id, { diskMtimeMs: m });
+            continue;
+          }
+          // 快照 mtime 与磁盘不一致：内容相同（只有时间戳被碰过，如同步工具）
+          // 就静默刷新基准；内容不同则保留快照，交给外部变更检测去提示。
+          try {
+            const r = await api.readFile(tab.filePath);
+            if (r.text === tab.content) {
+              get().updateTab(tab.id, {
+                diskMtimeMs: r.mtime_ms,
+                size: r.size,
+                encoding: r.encoding,
+                hasBom: r.has_bom,
+                lineEnding: r.line_ending,
+              });
+            }
+          } catch {
+            /* read failed — leave as-is */
+          }
         } catch {
           /* missing file — ignore */
         }
@@ -444,6 +483,7 @@ export const useStore = create<Store>((set, get) => ({
   newTab: () => {
     const t = makeUntitled(get().activeTab()?.encoding ?? "UTF-8");
     set((s) => ({ tabs: [...s.tabs, t], activeTabId: t.id, findOpen: false, replaceOpen: false }));
+    schedulePersist();
     return t.id;
   },
 
@@ -463,6 +503,7 @@ export const useStore = create<Store>((set, get) => ({
         s.reloadPrompt && idSet.has(s.reloadPrompt.tabId) ? null : s.reloadPrompt;
       return { tabs, activeTabId, findOpen: false, replaceOpen: false, reloadPrompt };
     });
+    schedulePersist();
   },
 
   requestClose: (id) => {
@@ -492,27 +533,41 @@ export const useStore = create<Store>((set, get) => ({
       await get().proceedInstallUpdate();
       return;
     }
-    get().doCloseTabs(c.tabIds);
     if (c.kind === "exit") {
-      await get().persist();
+      if (choice === "save") {
+        // 已保存的标签保留在会话里落盘；若先关标签，state 只剩空白标签，
+        // 下次启动整个会话无法恢复。
+        await get().persist();
+      } else {
+        get().doCloseTabs(c.tabIds);
+        await get().persist();
+      }
       try {
         await getCurrentWindow().destroy();
       } catch {
         /* ignore */
       }
+      return;
     }
+    get().doCloseTabs(c.tabIds);
   },
 
-  setActiveTab: (id) =>
-    set({ activeTabId: id, findOpen: false, replaceOpen: false, menuOpen: null }),
+  setActiveTab: (id) => {
+    set({ activeTabId: id, findOpen: false, replaceOpen: false, menuOpen: null });
+    schedulePersist();
+  },
 
-  updateTab: (id, patch) =>
-    set((s) => ({ tabs: s.tabs.map((t) => (t.id === id ? { ...t, ...patch } : t)) })),
+  updateTab: (id, patch) => {
+    set((s) => ({ tabs: s.tabs.map((t) => (t.id === id ? { ...t, ...patch } : t)) }));
+    schedulePersist();
+  },
 
-  setContent: (id, content) =>
+  setContent: (id, content) => {
     set((s) => ({
       tabs: s.tabs.map((t) => (t.id === id ? { ...t, content, dirty: true } : t)),
-    })),
+    }));
+    schedulePersist();
+  },
 
   openPath: async (path) => {
     const existing = get().tabs.find((t) => t.filePath === path);
@@ -573,6 +628,8 @@ export const useStore = create<Store>((set, get) => ({
       }));
       const { recordLocalHistory } = await import("@/lib/history");
       recordLocalHistory(tab.filePath, tab.content, "save");
+      // 保存即落盘：state 与磁盘同步，异常退出后重启不会误报「文件已被修改」
+      await get().persist();
       return true;
     } catch (e) {
       await api.nativeMessage("Jotpad", String(e));
@@ -615,6 +672,7 @@ export const useStore = create<Store>((set, get) => ({
       }));
       const { recordLocalHistory } = await import("@/lib/history");
       recordLocalHistory(path, tab.content, "saveAs");
+      await get().persist();
       return true;
     } catch (e) {
       await api.nativeMessage("Jotpad", String(e));
@@ -623,6 +681,7 @@ export const useStore = create<Store>((set, get) => ({
   },
 
   saveTabs: async (ids) => {
+    let wrote = false;
     for (const id of ids) {
       const tab = get().tabs.find((t) => t.id === id);
       if (!tab || !tab.dirty) continue;
@@ -635,12 +694,14 @@ export const useStore = create<Store>((set, get) => ({
           get().updateTab(id, { dirty: false, size, diskMtimeMs: mtime });
           const { recordLocalHistory } = await import("@/lib/history");
           recordLocalHistory(tab.filePath, tab.content, "save");
+          wrote = true;
         } catch (e) {
           await api.nativeMessage("Jotpad", String(e));
           return false;
         }
       }
     }
+    if (wrote) await get().persist();
     return true;
   },
 
@@ -679,6 +740,7 @@ export const useStore = create<Store>((set, get) => ({
       set((s) => ({
         recentFiles: s.recentFiles.map((p) => (p === oldPath ? newPath : p)),
       }));
+      schedulePersist();
       return true;
     } catch (e) {
       const msg = String(e);
@@ -720,7 +782,10 @@ export const useStore = create<Store>((set, get) => ({
     return true;
   },
 
-  clearRecent: () => set({ recentFiles: [] }),
+  clearRecent: () => {
+    set({ recentFiles: [] });
+    schedulePersist();
+  },
 
   togglePinned: (path) => {
     set((s) => ({
@@ -728,6 +793,7 @@ export const useStore = create<Store>((set, get) => ({
         ? s.pinnedPaths.filter((p) => p !== path)
         : [...s.pinnedPaths, path],
     }));
+    schedulePersist();
   },
 
   requestSaveSession: () => {
@@ -878,6 +944,30 @@ export const useStore = create<Store>((set, get) => ({
           }));
           continue;
         }
+        // mtime 变了但内容一致（同步/备份工具只碰时间戳）：静默刷新基准，不打扰
+        const path = tab.filePath;
+        try {
+          const r = await api.readFile(path);
+          if (r.text === tab.content) {
+            set((s) => ({
+              tabs: s.tabs.map((t) =>
+                t.filePath === path
+                  ? {
+                      ...t,
+                      diskMtimeMs: r.mtime_ms,
+                      size: r.size,
+                      encoding: r.encoding,
+                      hasBom: r.has_bom,
+                      lineEnding: r.line_ending,
+                    }
+                  : t,
+              ),
+            }));
+            continue;
+          }
+        } catch {
+          /* 读取失败：退回按外部修改提示 */
+        }
         set({ reloadPrompt: { tabId: tab.id, path: tab.filePath } });
         return;
       } catch {
@@ -903,6 +993,16 @@ export const useStore = create<Store>((set, get) => ({
       return;
     }
 
+    // 覆盖前先把未保存内容快照进本地历史，保证被磁盘版本替换后还能找回
+    if (tab.dirty) {
+      try {
+        const { recordLocalHistory } = await import("@/lib/history");
+        recordLocalHistory(tab.filePath, tab.content, "auto");
+      } catch {
+        /* ignore */
+      }
+    }
+
     try {
       const r = await api.readFile(tab.filePath);
       get().updateTab(tab.id, {
@@ -922,7 +1022,10 @@ export const useStore = create<Store>((set, get) => ({
     }
   },
 
-  setSettings: (patch) => set((s) => ({ settings: { ...s.settings, ...patch } })),
+  setSettings: (patch) => {
+    set((s) => ({ settings: { ...s.settings, ...patch } }));
+    schedulePersist();
+  },
 
   setEncoding: (encoding) => {
     const id = get().activeTabId;

@@ -17,7 +17,7 @@ import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import { tags as t } from "@lezer/highlight";
 import { findNext, findPrevious, search, selectSelectionMatches } from "@codemirror/search";
 import { useStore } from "@/store/useStore";
-import { emitEditorInfo, setEditorView, viewInfo } from "@/lib/editorRef";
+import { emitEditorInfo, isProgrammaticDocChange, setEditorView, viewInfo } from "@/lib/editorRef";
 import { cjkWordSelection } from "@/lib/cjkSelection";
 
 function spellcheckExt(on: boolean) {
@@ -154,7 +154,7 @@ export function Editor() {
           crosshairCursor(),
           cjkWordSelection,
           EditorView.updateListener.of((u) => {
-            if (u.docChanged && !loadingRef.current) {
+            if (u.docChanged && !loadingRef.current && !isProgrammaticDocChange()) {
               const id = useStore.getState().activeTabId;
               if (id) useStore.getState().setContent(id, u.state.doc.toString());
             }

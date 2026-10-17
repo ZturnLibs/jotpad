@@ -1137,6 +1137,10 @@ textarea {
   margin-bottom: 18px;
   line-height: 1.5;
 }
+.dialog p.dialog-warn {
+  margin-top: -12px;
+  color: var(--danger, #c42b1c);
+}
 .dialog-actions {
   display: flex;
   justify-content: flex-end;

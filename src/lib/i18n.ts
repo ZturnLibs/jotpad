@@ -205,6 +205,7 @@ const zhCN: Dict = {
   "dialog.saveError": "保存文件失败",
   "dialog.reloadTitle": "文件已更改",
   "dialog.reloadMsg": "磁盘上的“{name}”已被其他程序修改。是否重新加载？",
+  "dialog.reloadDirtyWarn": "注意：该标签页有未保存的修改，重新加载会用磁盘内容替换；当前内容将先快照到「本地历史」。",
   "dialog.reload": "重新加载",
   "dialog.reloadKeep": "保留当前内容",
 
@@ -506,6 +507,7 @@ const en: Dict = {
   "dialog.saveError": "Failed to save file",
   "dialog.reloadTitle": "File Changed",
   "dialog.reloadMsg": "“{name}” has been modified by another program. Reload it?",
+  "dialog.reloadDirtyWarn": "Heads-up: this tab has unsaved edits. Reloading replaces them with the disk version; the current text is snapshotted to Local History first.",
   "dialog.reload": "Reload",
   "dialog.reloadKeep": "Keep Editing",
 

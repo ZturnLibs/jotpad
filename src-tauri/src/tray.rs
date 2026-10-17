@@ -70,7 +70,13 @@ pub fn setup(app: &AppHandle) -> tauri::Result<()> {
                 }
             }
             "tray-quit" => {
-                app.exit(0);
+                // 走窗口关闭流程：让前端完成未保存确认与状态持久化后再退出。
+                // 直接 app.exit(0) 会跳过 persist，下次启动恢复旧快照并误报「文件已被修改」。
+                if let Some(w) = app.get_webview_window("main") {
+                    let _ = w.close();
+                } else {
+                    app.exit(0);
+                }
             }
             _ => {}
         })

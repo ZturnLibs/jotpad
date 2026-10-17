@@ -452,6 +452,19 @@ fn documents_dir(app: tauri::AppHandle) -> Result<String, String> {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let app = tauri::Builder::default()
+        // 单实例锁必须最先注册：第二个实例启动时聚焦既有窗口并转交文件，
+        // 避免两个实例共用同一 state 文件互相覆盖快照、互相误报外部修改。
+        .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
+            if let Some(w) = app.get_webview_window("main") {
+                let _ = w.show();
+                let _ = w.unminimize();
+                let _ = w.set_focus();
+            }
+            let paths = shell_integration::parse_launch_args(argv.into_iter().skip(1));
+            if !paths.is_empty() {
+                shell_integration::enqueue_open_paths(app, paths);
+            }
+        }))
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())

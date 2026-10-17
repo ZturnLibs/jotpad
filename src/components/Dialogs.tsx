@@ -66,6 +66,9 @@ export function ReloadDialog() {
   const prompt = useStore((s) => s.reloadPrompt);
   const resolve = useStore((s) => s.resolveReloadPrompt);
   const setHistoryOpen = useStore((s) => s.setHistoryOpen);
+  const dirty = useStore((s) =>
+    s.reloadPrompt ? !!s.tabs.find((t) => t.id === s.reloadPrompt?.tabId)?.dirty : false,
+  );
   const t = useT();
 
   if (!prompt) return null;
@@ -80,6 +83,7 @@ export function ReloadDialog() {
       <div className="dialog">
         <h3>{t("dialog.reloadTitle")}</h3>
         <p>{t("dialog.reloadMsg", { name })}</p>
+        {dirty ? <p className="dialog-warn">{t("dialog.reloadDirtyWarn")}</p> : null}
         <div className="dialog-actions">
           <button
             className="btn"
