@@ -237,6 +237,34 @@ describe("外部变更检测", () => {
   });
 });
 
+describe("md 视图设置归一化", () => {
+  it("持久化的 mdViewMode=source 生效，非法值回落 live", async () => {
+    vi.mocked(api.readState).mockResolvedValue({
+      version: 2,
+      activeTabId: "a",
+      settings: { ...DEFAULT_SETTINGS, startupMode: "restore", mdViewMode: "source" },
+      recentFiles: [],
+      pinnedPaths: [],
+      sessions: [],
+      tabs: [makeTab()],
+    } as AppState);
+    await useStore.getState().init();
+    expect(useStore.getState().settings.mdViewMode).toBe("source");
+
+    vi.mocked(api.readState).mockResolvedValue({
+      version: 2,
+      activeTabId: "a",
+      settings: { ...DEFAULT_SETTINGS, startupMode: "restore", mdViewMode: "bogus" },
+      recentFiles: [],
+      pinnedPaths: [],
+      sessions: [],
+      tabs: [makeTab()],
+    } as unknown as AppState);
+    await useStore.getState().init();
+    expect(useStore.getState().settings.mdViewMode).toBe("live");
+  });
+});
+
 describe("重新加载对未保存内容的保护", () => {
   it("reload 覆盖 dirty 内容前先快照到本地历史", async () => {
     useStore.setState({

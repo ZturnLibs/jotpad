@@ -240,6 +240,7 @@ function normalizeSettings(raw: Partial<AppSettings> & Record<string, unknown>):
   const merged = { ...DEFAULT_SETTINGS, ...raw };
   const startupMode: StartupMode =
     merged.startupMode === "blank" ? "blank" : "restore";
+  const mdViewMode: "live" | "source" = merged.mdViewMode === "source" ? "source" : "live";
   const skipped =
     typeof merged.skippedUpdateVersion === "string" && merged.skippedUpdateVersion
       ? merged.skippedUpdateVersion
@@ -265,6 +266,7 @@ function normalizeSettings(raw: Partial<AppSettings> & Record<string, unknown>):
     showLineNumbers: !!merged.showLineNumbers,
     spellCheck: !!merged.spellCheck,
     startupMode,
+    mdViewMode,
     accent: merged.accent,
     autoCheckUpdates: merged.autoCheckUpdates !== false,
     skippedUpdateVersion: skipped,

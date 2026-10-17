@@ -80,6 +80,8 @@ export interface AppSettings {
   spellCheck: boolean;
   /** Whether to restore open tabs on launch. */
   startupMode: StartupMode;
+  /** Markdown 即时渲染的视图偏好（experimental.mdLive 开启时生效）。 */
+  mdViewMode: "live" | "source";
   accent: string; // "system" or hex like "#0067C0"
   /** 启动后静默检查更新（默认开）。 */
   autoCheckUpdates: boolean;
@@ -115,6 +117,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   showLineNumbers: false,
   spellCheck: false,
   startupMode: "restore",
+  mdViewMode: "live",
   accent: "system",
   autoCheckUpdates: true,
   skippedUpdateVersion: null,
