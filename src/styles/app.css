@@ -291,6 +291,24 @@ textarea {
 .tab.dragging {
   opacity: 0.45;
 }
+/* 指针拖动期间：全局抓手光标 + 禁止选区 */
+body.tab-dragging,
+body.tab-dragging * {
+  cursor: grabbing !important;
+  user-select: none;
+  -webkit-user-select: none;
+}
+/* 跟随指针的浮动幽灵（源标签克隆） */
+.tab-ghost {
+  position: fixed;
+  z-index: 1000;
+  margin: 0;
+  pointer-events: none;
+  background: var(--bg-selected);
+  color: var(--text);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.28);
+  opacity: 0.92;
+}
 .tab.drop-before::before,
 .tab.drop-after::after {
   content: "";

@@ -37,15 +37,21 @@ export function TabBar() {
   const inputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const ctxRef = useRef<HTMLDivElement>(null);
-  /** 拖动时靠近滚动区上下缘的自动滚动速度（px/帧）；0 = 停止。 */
-  const dragScroll = useRef(0);
-  /** 最近一次 dragover 时间：指针离开列表后停止惯性滚动。 */
-  const dragOverAt = useRef(0);
   const skipCommit = useRef(false);
   /** Ignore blur right after entering rename (dblclick can steal focus). */
   const armedAt = useRef(0);
   /** Fallback when OS/titlebar swallows native dblclick. */
   const lastClick = useRef<{ id: string; at: number } | null>(null);
+
+  // ---- 指针拖动排序 ----
+  // 不用 HTML5 DnD：Tauri 的原生文件拖放处理（dragDropEnabled）会拦截 WebView
+  // 内的 dragover/drop，页面内拖拽在打包应用里失效，故用指针事件自绘。
+  const dragIdRef = useRef<string | null>(null);
+  const dropRef = useRef<{ overId: string; place: "before" | "after" } | null>(null);
+  const dragPt = useRef<{ x: number; y: number } | null>(null);
+  const ghostRef = useRef<HTMLElement | null>(null);
+  /** 拖动结束后吞掉紧随的 click（指针拖动松手仍会派发 click）。 */
+  const suppressClick = useRef(false);
 
   const pinnedSet = useMemo(() => new Set(pinnedPaths), [pinnedPaths]);
 
@@ -55,35 +61,159 @@ export function TabBar() {
     [t],
   );
 
-  const isPinnedTab = useCallback(
-    (tab: { filePath: string | null }) =>
-      !!tab.filePath && pinnedSet.has(tab.filePath),
-    [pinnedSet],
-  );
+  /** 由指针坐标计算落点：标签上/下半区 → 前/后；列表空白区 → 本组末尾；跨组/越界 → 无。 */
+  const updateDropFromPoint = useCallback((srcId: string, x: number, y: number) => {
+    const { tabs: all, pinnedPaths } = useStore.getState();
+    const src = all.find((t) => t.id === srcId);
+    if (!src) return;
+    const pinned = new Set(pinnedPaths);
+    const isPinned = (t: { filePath: string | null }) => !!t.filePath && pinned.has(t.filePath);
 
-  /** 指针在标签上半/下半 → 落到其前/后。 */
-  const dropPlace = (el: HTMLElement, clientY: number): "before" | "after" => {
+    const apply = (next: { overId: string; place: "before" | "after" } | null) => {
+      dropRef.current = next;
+      setDrop((prev) =>
+        prev?.overId === next?.overId && prev?.place === next?.place ? prev : next,
+      );
+    };
+
+    const root = scrollRef.current;
+    const hit = document.elementFromPoint(x, y);
+    const tabEl = hit ? (hit.closest(".tab") as HTMLElement | null) : null;
+    if (tabEl && root && root.contains(tabEl)) {
+      const overId = tabEl.dataset.tabId ?? "";
+      const over = overId && overId !== srcId ? all.find((t) => t.id === overId) : undefined;
+      if (over && isPinned(src) === isPinned(over)) {
+        const r = tabEl.getBoundingClientRect();
+        const place = y < r.top + r.height / 2 ? "before" : "after";
+        apply({ overId, place });
+        return;
+      }
+      apply(null);
+      return;
+    }
+    // 悬在列表空白区：追加到本组（置顶/普通）末尾
+    if (root) {
+      const r = root.getBoundingClientRect();
+      if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) {
+        for (let i = all.length - 1; i >= 0; i--) {
+          const t = all[i];
+          if (t.id !== src.id && isPinned(t) === isPinned(src)) {
+            apply({ overId: t.id, place: "after" });
+            return;
+          }
+        }
+      }
+    }
+    apply(null);
+  }, []);
+
+  const makeGhost = (el: HTMLElement) => {
+    const g = el.cloneNode(true) as HTMLElement;
+    g.className = "tab tab-ghost" + (el.classList.contains("active") ? " active" : "");
     const r = el.getBoundingClientRect();
-    return clientY < r.top + r.height / 2 ? "before" : "after";
+    g.style.left = `${r.left}px`;
+    g.style.width = `${r.width}px`;
+    g.style.top = `${r.top}px`;
+    document.body.appendChild(g);
+    ghostRef.current = g;
   };
 
-  const dragTab = dragId ? (tabs.find((x) => x.id === dragId) ?? null) : null;
+  const moveGhost = (y: number) => {
+    const g = ghostRef.current;
+    if (g) g.style.top = `${y - g.offsetHeight / 2}px`;
+  };
 
-  // 拖动期间靠近列表上下缘时持续滚动；dragover 停更 150ms 视为指针已离开。
+  const removeGhost = () => {
+    ghostRef.current?.remove();
+    ghostRef.current = null;
+  };
+
+  const endDrag = () => {
+    dragIdRef.current = null;
+    dropRef.current = null;
+    dragPt.current = null;
+    setDragId(null);
+    setDrop(null);
+    document.body.classList.remove("tab-dragging");
+    removeGhost();
+  };
+
+  /** 按下即挂监听；位移超阈值才算拖动（不影响单击/双击重命名）。 */
+  const beginPressTracking = (
+    id: string,
+    el: HTMLElement,
+    pointerId: number,
+    startX: number,
+    startY: number,
+  ) => {
+    suppressClick.current = false;
+    const onMove = (ev: PointerEvent) => {
+      if (!dragIdRef.current) {
+        if (Math.hypot(ev.clientX - startX, ev.clientY - startY) < 4) return;
+        dragIdRef.current = id;
+        suppressClick.current = true;
+        // 捕获保证指针移出窗口后 move/up 仍送达本元素
+        try {
+          el.setPointerCapture(pointerId);
+        } catch {
+          /* 已松开等异常：忽略 */
+        }
+        document.body.classList.add("tab-dragging");
+        window.getSelection()?.removeAllRanges();
+        makeGhost(el);
+        setDragId(id);
+      }
+      dragPt.current = { x: ev.clientX, y: ev.clientY };
+      moveGhost(ev.clientY);
+      updateDropFromPoint(id, ev.clientX, ev.clientY);
+    };
+    const finish = (commit: boolean) => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onCancel);
+      window.removeEventListener("blur", onBlur);
+      window.removeEventListener("keydown", onKey);
+      if (dragIdRef.current === id) {
+        const target = commit ? dropRef.current : null;
+        endDrag();
+        if (target) moveTab(id, target.overId, target.place);
+      }
+    };
+    const onUp = () => finish(true);
+    const onCancel = () => finish(false);
+    const onBlur = () => finish(false);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") finish(false);
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onCancel);
+    window.addEventListener("blur", onBlur);
+    window.addEventListener("keydown", onKey);
+  };
+
+  // 拖动期间：靠近列表上下缘持续滚动；内容从指针下滚过时同步刷新指示线。
   useEffect(() => {
     if (!dragId) return;
     let raf = 0;
     const tick = () => {
-      if (Date.now() - dragOverAt.current > 150) dragScroll.current = 0;
-      else if (dragScroll.current) scrollRef.current?.scrollBy({ top: dragScroll.current });
+      const root = scrollRef.current;
+      const pt = dragPt.current;
+      if (root && pt) {
+        const r = root.getBoundingClientRect();
+        let v = 0;
+        if (pt.y < r.top + 28) v = -10;
+        else if (pt.y > r.bottom - 28) v = 10;
+        if (v) {
+          root.scrollBy({ top: v });
+          if (dragIdRef.current) updateDropFromPoint(dragIdRef.current, pt.x, pt.y);
+        }
+      }
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
-    return () => {
-      cancelAnimationFrame(raf);
-      dragScroll.current = 0;
-    };
-  }, [dragId]);
+    return () => cancelAnimationFrame(raf);
+  }, [dragId, updateDropFromPoint]);
 
   const revealLabel = (() => {
     const p = platform();
@@ -258,12 +388,6 @@ export function TabBar() {
     return pa - pb; // 稳定排序：不改变同组内原有顺序
   });
   const showFilter = tabs.length >= 2;
-  /** 列表空白区落点：拖动标签所在组（置顶/普通）的最后一个其他标签。 */
-  const groupEndTab = dragTab
-    ? ([...visibleTabs].reverse().find(
-        (x) => x.id !== dragTab.id && isPinnedTab(x) === isPinnedTab(dragTab),
-      ) ?? null)
-    : null;
 
   return (
     <div className="tabs">
@@ -280,43 +404,7 @@ export function TabBar() {
           />
         </div>
       ) : null}
-      <div
-        className="tabs-scroll"
-        ref={scrollRef}
-        role="tablist"
-        aria-orientation="vertical"
-        onDragOver={(e) => {
-          dragOverAt.current = Date.now();
-          const root = scrollRef.current;
-          if (root) {
-            const r = root.getBoundingClientRect();
-            if (e.clientY < r.top + 28) dragScroll.current = -10;
-            else if (e.clientY > r.bottom - 28) dragScroll.current = 10;
-            else dragScroll.current = 0;
-          }
-          if (e.target !== e.currentTarget || !dragTab) return;
-          // 列表空白区也是合法落点：追加到本组末尾，光标保持移动而非禁止
-          e.preventDefault();
-          e.dataTransfer.dropEffect = "move";
-          if (groupEndTab) {
-            setDrop((prev) =>
-              prev && prev.overId === groupEndTab.id && prev.place === "after"
-                ? prev
-                : { overId: groupEndTab.id, place: "after" },
-            );
-          } else {
-            setDrop(null);
-          }
-        }}
-        onDrop={(e) => {
-          if (e.target !== e.currentTarget) return;
-          e.preventDefault();
-          const src = dragTab;
-          setDragId(null);
-          setDrop(null);
-          if (src && groupEndTab) moveTab(src.id, groupEndTab.id, "after");
-        }}
-      >
+      <div className="tabs-scroll" ref={scrollRef} role="tablist" aria-orientation="vertical">
         {visibleTabs.length === 0 && filterNorm ? (
           <div className="tabs-filter-empty muted">{t("tab.filterEmpty")}</div>
         ) : null}
@@ -343,42 +431,18 @@ export function TabBar() {
                     : " drop-after"
                   : "")
               }
-              draggable={!editing && !filterNorm}
-              onDragStart={(e) => {
-                e.dataTransfer.effectAllowed = "move";
-                e.dataTransfer.setData("text/plain", tab.id);
-                setDragId(tab.id);
-              }}
-              onDragEnd={() => {
-                setDragId(null);
-                setDrop(null);
-              }}
-              onDragOver={(e) => {
-                if (!dragTab) return;
-                // 置顶组与普通组不可互拖（不 preventDefault，光标显示禁止）
-                if (dragTab.id !== tab.id && isPinnedTab(dragTab) !== isPinnedTab(tab)) return;
-                // 自身也是合法落点（no-op）：路过原位时光标不闪禁止符
-                e.preventDefault();
-                e.dataTransfer.dropEffect = "move";
-                if (dragTab.id === tab.id) return;
-                const place = dropPlace(e.currentTarget, e.clientY);
-                setDrop((prev) =>
-                  prev && prev.overId === tab.id && prev.place === place
-                    ? prev
-                    : { overId: tab.id, place },
-                );
-              }}
-              onDrop={(e) => {
-                e.preventDefault();
-                const src = dragTab;
-                setDragId(null);
-                setDrop(null);
-                if (!src || src.id === tab.id) return;
-                if (isPinnedTab(src) !== isPinnedTab(tab)) return;
-                moveTab(src.id, tab.id, dropPlace(e.currentTarget, e.clientY));
+              onPointerDown={(e) => {
+                if (e.button !== 0 || editing || filterNorm) return;
+                if (dragIdRef.current) return;
+                if ((e.target as HTMLElement).closest(".tab-close, .tab-title-input")) return;
+                beginPressTracking(tab.id, e.currentTarget, e.pointerId, e.clientX, e.clientY);
               }}
               onClick={() => {
                 if (editing) return;
+                if (suppressClick.current) {
+                  suppressClick.current = false;
+                  return;
+                }
                 setActiveTab(tab.id);
                 if (!tab.filePath) {
                   lastClick.current = null;
