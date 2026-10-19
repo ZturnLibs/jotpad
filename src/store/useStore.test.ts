@@ -265,6 +265,41 @@ describe("md 视图设置归一化", () => {
   });
 });
 
+describe("标签拖动排序", () => {
+  it("moveTab 把标签移到目标前/后并触发防抖持久化", async () => {
+    useStore.setState({
+      tabs: [
+        makeTab({ id: "a", filePath: "/tmp/a.txt" }),
+        makeTab({ id: "b", filePath: "/tmp/b.txt" }),
+        makeTab({ id: "c", filePath: "/tmp/c.txt" }),
+      ],
+      activeTabId: "a",
+    });
+
+    useStore.getState().moveTab("c", "a", "before");
+    expect(useStore.getState().tabs.map((x) => x.id)).toEqual(["c", "a", "b"]);
+
+    useStore.getState().moveTab("a", "b", "after");
+    expect(useStore.getState().tabs.map((x) => x.id)).toEqual(["c", "b", "a"]);
+
+    await vi.advanceTimersByTimeAsync(2100);
+    expect(lastWriteState().tabs.map((x) => x.id)).toEqual(["c", "b", "a"]);
+  });
+
+  it("moveTab 拖到自身或不存在目标时保持原顺序", () => {
+    useStore.setState({
+      tabs: [makeTab({ id: "a" }), makeTab({ id: "b", filePath: "/tmp/b.txt" })],
+      activeTabId: "a",
+    });
+
+    useStore.getState().moveTab("a", "a", "after");
+    expect(useStore.getState().tabs.map((x) => x.id)).toEqual(["a", "b"]);
+
+    useStore.getState().moveTab("a", "ghost", "before");
+    expect(useStore.getState().tabs.map((x) => x.id)).toEqual(["a", "b"]);
+  });
+});
+
 describe("重新加载对未保存内容的保护", () => {
   it("reload 覆盖 dirty 内容前先快照到本地历史", async () => {
     useStore.setState({

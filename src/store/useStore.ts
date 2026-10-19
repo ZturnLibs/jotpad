@@ -141,6 +141,8 @@ interface Store {
   requestClose: (id: string) => void;
   resolveConfirm: (choice: "save" | "discard" | "cancel") => Promise<void>;
   setActiveTab: (id: string) => void;
+  /** 拖动排序：把 dragId 移到 overId 的前/后（置顶组约束由 UI 层保证）。 */
+  moveTab: (dragId: string, overId: string, place: "before" | "after") => void;
   updateTab: (id: string, patch: Partial<TabState>) => void;
   setContent: (id: string, content: string) => void;
 
@@ -556,6 +558,21 @@ export const useStore = create<Store>((set, get) => ({
 
   setActiveTab: (id) => {
     set({ activeTabId: id, findOpen: false, replaceOpen: false, menuOpen: null });
+    schedulePersist();
+  },
+
+  moveTab: (dragId, overId, place) => {
+    const tabs = [...get().tabs];
+    const from = tabs.findIndex((t) => t.id === dragId);
+    if (from < 0 || dragId === overId) return;
+    const [moved] = tabs.splice(from, 1);
+    const insertAt = tabs.findIndex((t) => t.id === overId);
+    if (insertAt < 0) {
+      tabs.splice(from, 0, moved);
+      return;
+    }
+    tabs.splice(place === "after" ? insertAt + 1 : insertAt, 0, moved);
+    set({ tabs });
     schedulePersist();
   },
 
