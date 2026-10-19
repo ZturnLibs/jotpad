@@ -258,6 +258,12 @@ export function TabBar() {
     return pa - pb; // 稳定排序：不改变同组内原有顺序
   });
   const showFilter = tabs.length >= 2;
+  /** 列表空白区落点：拖动标签所在组（置顶/普通）的最后一个其他标签。 */
+  const groupEndTab = dragTab
+    ? ([...visibleTabs].reverse().find(
+        (x) => x.id !== dragTab.id && isPinnedTab(x) === isPinnedTab(dragTab),
+      ) ?? null)
+    : null;
 
   return (
     <div className="tabs">
@@ -288,8 +294,27 @@ export function TabBar() {
             else if (e.clientY > r.bottom - 28) dragScroll.current = 10;
             else dragScroll.current = 0;
           }
-          // 空白处不显示落点指示
-          if (e.target === e.currentTarget) setDrop(null);
+          if (e.target !== e.currentTarget || !dragTab) return;
+          // 列表空白区也是合法落点：追加到本组末尾，光标保持移动而非禁止
+          e.preventDefault();
+          e.dataTransfer.dropEffect = "move";
+          if (groupEndTab) {
+            setDrop((prev) =>
+              prev && prev.overId === groupEndTab.id && prev.place === "after"
+                ? prev
+                : { overId: groupEndTab.id, place: "after" },
+            );
+          } else {
+            setDrop(null);
+          }
+        }}
+        onDrop={(e) => {
+          if (e.target !== e.currentTarget) return;
+          e.preventDefault();
+          const src = dragTab;
+          setDragId(null);
+          setDrop(null);
+          if (src && groupEndTab) moveTab(src.id, groupEndTab.id, "after");
         }}
       >
         {visibleTabs.length === 0 && filterNorm ? (
@@ -329,11 +354,13 @@ export function TabBar() {
                 setDrop(null);
               }}
               onDragOver={(e) => {
-                if (!dragTab || dragTab.id === tab.id) return;
+                if (!dragTab) return;
                 // 置顶组与普通组不可互拖（不 preventDefault，光标显示禁止）
-                if (isPinnedTab(dragTab) !== isPinnedTab(tab)) return;
+                if (dragTab.id !== tab.id && isPinnedTab(dragTab) !== isPinnedTab(tab)) return;
+                // 自身也是合法落点（no-op）：路过原位时光标不闪禁止符
                 e.preventDefault();
                 e.dataTransfer.dropEffect = "move";
+                if (dragTab.id === tab.id) return;
                 const place = dropPlace(e.currentTarget, e.clientY);
                 setDrop((prev) =>
                   prev && prev.overId === tab.id && prev.place === place

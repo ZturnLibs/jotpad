@@ -170,9 +170,13 @@ textarea {
   border: none;
   -webkit-app-region: no-drag;
   app-region: no-drag;
-  cursor: pointer;
+  /* 悬停提示可拖拽；原生拖动开始后由 dropEffect 接管光标 */
+  cursor: grab;
   position: relative;
   transition: background var(--transition), color var(--transition);
+}
+.tab:active:not(.editing) {
+  cursor: grabbing;
 }
 .tab:hover:not(.active) {
   background: var(--bg-hover);
@@ -264,6 +268,7 @@ textarea {
   border-radius: 4px;
   color: var(--text-secondary);
   opacity: 0;
+  cursor: pointer;
   transition: opacity var(--transition), background var(--transition);
 }
 .tab:hover .tab-close,
