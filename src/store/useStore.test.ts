@@ -298,6 +298,27 @@ describe("标签拖动排序", () => {
     useStore.getState().moveTab("a", "ghost", "before");
     expect(useStore.getState().tabs.map((x) => x.id)).toEqual(["a", "b"]);
   });
+
+  it("reorderTabs 按给定序重排；id 集不一致时忽略", () => {
+    useStore.setState({
+      tabs: [
+        makeTab({ id: "a", filePath: "/tmp/a.txt" }),
+        makeTab({ id: "b", filePath: "/tmp/b.txt" }),
+        makeTab({ id: "c", filePath: "/tmp/c.txt" }),
+      ],
+      activeTabId: "a",
+    });
+
+    useStore.getState().reorderTabs(["c", "a", "b"]);
+    expect(useStore.getState().tabs.map((x) => x.id)).toEqual(["c", "a", "b"]);
+    expect(useStore.getState().tabs[0].filePath).toBe("/tmp/c.txt");
+
+    useStore.getState().reorderTabs(["a", "b"]); // 少一个 id
+    expect(useStore.getState().tabs.map((x) => x.id)).toEqual(["c", "a", "b"]);
+
+    useStore.getState().reorderTabs(["a", "b", "c", "ghost"]); // 多一个 id
+    expect(useStore.getState().tabs.map((x) => x.id)).toEqual(["c", "a", "b"]);
+  });
 });
 
 describe("重新加载对未保存内容的保护", () => {

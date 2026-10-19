@@ -143,6 +143,8 @@ interface Store {
   setActiveTab: (id: string) => void;
   /** 拖动排序：把 dragId 移到 overId 的前/后（置顶组约束由 UI 层保证）。 */
   moveTab: (dragId: string, overId: string, place: "before" | "after") => void;
+  /** 按给定 id 序整体重排标签（dnd-kit 拖放落点；id 集必须与当前一致）。 */
+  reorderTabs: (ids: string[]) => void;
   updateTab: (id: string, patch: Partial<TabState>) => void;
   setContent: (id: string, content: string) => void;
 
@@ -573,6 +575,15 @@ export const useStore = create<Store>((set, get) => ({
     }
     tabs.splice(place === "after" ? insertAt + 1 : insertAt, 0, moved);
     set({ tabs });
+    schedulePersist();
+  },
+
+  reorderTabs: (ids) => {
+    const cur = get().tabs;
+    if (ids.length !== cur.length) return;
+    const byId = new Map(cur.map((t) => [t.id, t]));
+    if (ids.some((id) => !byId.has(id))) return;
+    set({ tabs: ids.map((id) => byId.get(id)!) });
     schedulePersist();
   },
 

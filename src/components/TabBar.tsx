@@ -1,4 +1,34 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  cloneElement,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+  type ReactElement,
+} from "react";
+import {
+  DndContext,
+  DragOverlay,
+  KeyboardSensor,
+  PointerSensor,
+  useDroppable,
+  useSensor,
+  useSensors,
+  type CollisionDetection,
+  type DragEndEvent,
+  type DragOverEvent,
+  type DragStartEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  arrayMove,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { useStore } from "@/store/useStore";
 import { useT } from "@/lib/i18n";
 import { basename, clipboardWriteText, nativeMessage, revealInFolder } from "@/lib/backend";
@@ -14,6 +44,85 @@ interface CtxMenu {
 
 type CtxAction = "copyPath" | "rename" | "reveal" | "delete" | "pin" | "close" | "closeOthers";
 
+/** 列表空白区（最后一个标签下方）：追加到本组末尾的落点。 */
+const BLANK_ID = "tabs-blank";
+
+/**
+ * 矩形相交面积最大者为落点标签；仅与空白区相交时命中 BLANK；列表外无落点。
+ * 用 collisionRect（当前传感器实时更新的拖动项矩形），不用 pointerCoordinates——
+ * 它会残留上一次指针位置、污染后续键盘拖动。
+ */
+const tabCollisionDetection: CollisionDetection = ({
+  active,
+  collisionRect,
+  droppableContainers,
+  droppableRects,
+}) => {
+  let blank = false;
+  let bestTab: string | null = null;
+  let bestOverlap = 0;
+  for (const container of droppableContainers) {
+    const id = String(container.id);
+    if (id === String(active?.id)) continue;
+    const rect = droppableRects.get(container.id);
+    if (!rect) continue;
+    const w = Math.min(collisionRect.right, rect.right) - Math.max(collisionRect.left, rect.left);
+    const h = Math.min(collisionRect.bottom, rect.bottom) - Math.max(collisionRect.top, rect.top);
+    if (w <= 0 || h <= 0) continue;
+    if (id === BLANK_ID) {
+      blank = true;
+      continue;
+    }
+    const area = w * h;
+    if (area > bestOverlap) {
+      bestOverlap = area;
+      bestTab = id;
+    }
+  }
+  if (bestTab != null) return [{ id: bestTab }];
+  if (blank) return [{ id: BLANK_ID }];
+  return [];
+};
+
+/**
+ * 把 dnd-kit sortable 能力挂到现有标签 div 上（cloneElement，DOM 无额外包裹层）。
+ * 手动合并 listeners：跳过从关闭按钮/重命名输入框发起的拖动，并保留 role="tab" 等原有 aria。
+ */
+function SortableTab({
+  id,
+  disabled,
+  children,
+}: {
+  id: string;
+  disabled?: boolean;
+  children: ReactElement<Record<string, unknown>>;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({
+    id,
+    disabled,
+  });
+  const rawPointerDown = listeners?.onPointerDown as
+    | ((event: ReactPointerEvent) => void)
+    | undefined;
+  return cloneElement(children, {
+    ref: setNodeRef,
+    style: { transform: CSS.Transform.toString(transform), transition },
+    tabIndex: attributes.tabIndex,
+    "aria-roledescription": "sortable",
+    ...listeners,
+    onPointerDown: (e: ReactPointerEvent) => {
+      if ((e.target as HTMLElement).closest(".tab-close, .tab-title-input")) return;
+      rawPointerDown?.(e);
+    },
+  });
+}
+
+/** 列表空白区落点：必须挂在 DndContext 内部才能注册。 */
+function BlankDropZone() {
+  const { setNodeRef } = useDroppable({ id: BLANK_ID });
+  return <div ref={setNodeRef} className="tabs-blank" aria-hidden="true" />;
+}
+
 export function TabBar() {
   const tabs = useStore((s) => s.tabs);
   const pinnedPaths = useStore((s) => s.pinnedPaths);
@@ -25,6 +134,7 @@ export function TabBar() {
   const deleteTabFile = useStore((s) => s.deleteTabFile);
   const doCloseTabs = useStore((s) => s.doCloseTabs);
   const moveTab = useStore((s) => s.moveTab);
+  const reorderTabs = useStore((s) => s.reorderTabs);
   const t = useT();
 
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -32,28 +142,24 @@ export function TabBar() {
   const [ctx, setCtx] = useState<CtxMenu | null>(null);
   const [filter, setFilter] = useState("");
   const [dragId, setDragId] = useState<string | null>(null);
-  const [drop, setDrop] = useState<{ overId: string; place: "before" | "after" } | null>(null);
+  const [overId, setOverId] = useState<string | null>(null);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const ctxRef = useRef<HTMLDivElement>(null);
+  /** 拖动结束时间：吞掉松手后紧随的 click（dnd-kit 不拦截 click）。 */
+  const draggedAt = useRef(0);
   const skipCommit = useRef(false);
   /** Ignore blur right after entering rename (dblclick can steal focus). */
   const armedAt = useRef(0);
   /** Fallback when OS/titlebar swallows native dblclick. */
   const lastClick = useRef<{ id: string; at: number } | null>(null);
 
-  // ---- 指针拖动排序 ----
-  // 不用 HTML5 DnD：Tauri 的原生文件拖放处理（dragDropEnabled）会拦截 WebView
-  // 内的 dragover/drop，页面内拖拽在打包应用里失效，故用指针事件自绘。
-  const dragIdRef = useRef<string | null>(null);
-  const dropRef = useRef<{ overId: string; place: "before" | "after" } | null>(null);
-  const dragPt = useRef<{ x: number; y: number } | null>(null);
-  const ghostRef = useRef<HTMLElement | null>(null);
-  /** 拖动结束后吞掉紧随的 click（指针拖动松手仍会派发 click）。 */
-  const suppressClick = useRef(false);
-
   const pinnedSet = useMemo(() => new Set(pinnedPaths), [pinnedPaths]);
+  const isPinnedOf = useCallback(
+    (tab: { filePath: string | null }) => !!tab.filePath && pinnedSet.has(tab.filePath),
+    [pinnedSet],
+  );
 
   const tabLabel = useCallback(
     (tab: { filePath: string | null }) =>
@@ -61,159 +167,71 @@ export function TabBar() {
     [t],
   );
 
-  /** 由指针坐标计算落点：标签上/下半区 → 前/后；列表空白区 → 本组末尾；跨组/越界 → 无。 */
-  const updateDropFromPoint = useCallback((srcId: string, x: number, y: number) => {
-    const { tabs: all, pinnedPaths } = useStore.getState();
-    const src = all.find((t) => t.id === srcId);
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
+  const dragTab = dragId ? (tabs.find((x) => x.id === dragId) ?? null) : null;
+  /** 空白区落点高亮目标：拖动标签所在组的最后一个其他标签。 */
+  const blankTargetId = dragTab
+    ? ([...tabs].reverse().find((x) => x.id !== dragTab.id && isPinnedOf(x) === isPinnedOf(dragTab))
+        ?.id ?? null)
+    : null;
+
+  const clearDragFeedback = () => {
+    draggedAt.current = Date.now();
+    setDragId(null);
+    setOverId(null);
+    document.body.classList.remove("tab-dragging");
+  };
+
+  const onDragStart = (e: DragStartEvent) => {
+    setDragId(String(e.active.id));
+    document.body.classList.add("tab-dragging");
+  };
+
+  const onDragOver = (e: DragOverEvent) => {
+    setOverId(e.over ? String(e.over.id) : null);
+  };
+
+  const onDragEnd = (e: DragEndEvent) => {
+    const activeId = String(e.active.id);
+    const over = e.over ? String(e.over.id) : null;
+    clearDragFeedback();
+    if (!over || over === activeId) return;
+    const src = useStore.getState().tabs.find((x) => x.id === activeId);
     if (!src) return;
-    const pinned = new Set(pinnedPaths);
-    const isPinned = (t: { filePath: string | null }) => !!t.filePath && pinned.has(t.filePath);
+    const { tabs: all, pinnedPaths: pins } = useStore.getState();
+    const pinned = new Set(pins);
+    const isPinned = (x: { filePath: string | null }) => !!x.filePath && pinned.has(x.filePath);
+    const srcPinned = isPinned(src);
 
-    const apply = (next: { overId: string; place: "before" | "after" } | null) => {
-      dropRef.current = next;
-      setDrop((prev) =>
-        prev?.overId === next?.overId && prev?.place === next?.place ? prev : next,
-      );
-    };
-
-    const root = scrollRef.current;
-    const hit = document.elementFromPoint(x, y);
-    const tabEl = hit ? (hit.closest(".tab") as HTMLElement | null) : null;
-    if (tabEl && root && root.contains(tabEl)) {
-      const overId = tabEl.dataset.tabId ?? "";
-      const over = overId && overId !== srcId ? all.find((t) => t.id === overId) : undefined;
-      if (over && isPinned(src) === isPinned(over)) {
-        const r = tabEl.getBoundingClientRect();
-        const place = y < r.top + r.height / 2 ? "before" : "after";
-        apply({ overId, place });
-        return;
+    if (over === BLANK_ID) {
+      // 空白区：追加到本组末尾
+      for (let i = all.length - 1; i >= 0; i--) {
+        const x = all[i];
+        if (x.id !== activeId && isPinned(x) === srcPinned) {
+          moveTab(activeId, x.id, "after");
+          return;
+        }
       }
-      apply(null);
       return;
     }
-    // 悬在列表空白区：追加到本组（置顶/普通）末尾
-    if (root) {
-      const r = root.getBoundingClientRect();
-      if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) {
-        for (let i = all.length - 1; i >= 0; i--) {
-          const t = all[i];
-          if (t.id !== src.id && isPinned(t) === isPinned(src)) {
-            apply({ overId: t.id, place: "after" });
-            return;
-          }
-        }
-      }
-    }
-    apply(null);
-  }, []);
 
-  const makeGhost = (el: HTMLElement) => {
-    const g = el.cloneNode(true) as HTMLElement;
-    g.className = "tab tab-ghost" + (el.classList.contains("active") ? " active" : "");
-    const r = el.getBoundingClientRect();
-    g.style.left = `${r.left}px`;
-    g.style.width = `${r.width}px`;
-    g.style.top = `${r.top}px`;
-    document.body.appendChild(g);
-    ghostRef.current = g;
+    const target = all.find((x) => x.id === over);
+    if (!target || isPinned(target) !== srcPinned) return; // 置顶组与普通组不可互拖
+
+    const display = [...all].sort((a, b) => {
+      const pa = a.filePath ? (pinned.has(a.filePath) ? 0 : 1) : 1;
+      const pb = b.filePath ? (pinned.has(b.filePath) ? 0 : 1) : 1;
+      return pa - pb;
+    });
+    const from = display.findIndex((x) => x.id === activeId);
+    const to = display.findIndex((x) => x.id === over);
+    if (from < 0 || to < 0) return;
+    reorderTabs(arrayMove(display, from, to).map((x) => x.id));
   };
-
-  const moveGhost = (y: number) => {
-    const g = ghostRef.current;
-    if (g) g.style.top = `${y - g.offsetHeight / 2}px`;
-  };
-
-  const removeGhost = () => {
-    ghostRef.current?.remove();
-    ghostRef.current = null;
-  };
-
-  const endDrag = () => {
-    dragIdRef.current = null;
-    dropRef.current = null;
-    dragPt.current = null;
-    setDragId(null);
-    setDrop(null);
-    document.body.classList.remove("tab-dragging");
-    removeGhost();
-  };
-
-  /** 按下即挂监听；位移超阈值才算拖动（不影响单击/双击重命名）。 */
-  const beginPressTracking = (
-    id: string,
-    el: HTMLElement,
-    pointerId: number,
-    startX: number,
-    startY: number,
-  ) => {
-    suppressClick.current = false;
-    const onMove = (ev: PointerEvent) => {
-      if (!dragIdRef.current) {
-        if (Math.hypot(ev.clientX - startX, ev.clientY - startY) < 4) return;
-        dragIdRef.current = id;
-        suppressClick.current = true;
-        // 捕获保证指针移出窗口后 move/up 仍送达本元素
-        try {
-          el.setPointerCapture(pointerId);
-        } catch {
-          /* 已松开等异常：忽略 */
-        }
-        document.body.classList.add("tab-dragging");
-        window.getSelection()?.removeAllRanges();
-        makeGhost(el);
-        setDragId(id);
-      }
-      dragPt.current = { x: ev.clientX, y: ev.clientY };
-      moveGhost(ev.clientY);
-      updateDropFromPoint(id, ev.clientX, ev.clientY);
-    };
-    const finish = (commit: boolean) => {
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerup", onUp);
-      window.removeEventListener("pointercancel", onCancel);
-      window.removeEventListener("blur", onBlur);
-      window.removeEventListener("keydown", onKey);
-      if (dragIdRef.current === id) {
-        const target = commit ? dropRef.current : null;
-        endDrag();
-        if (target) moveTab(id, target.overId, target.place);
-      }
-    };
-    const onUp = () => finish(true);
-    const onCancel = () => finish(false);
-    const onBlur = () => finish(false);
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") finish(false);
-    };
-    window.addEventListener("pointermove", onMove);
-    window.addEventListener("pointerup", onUp);
-    window.addEventListener("pointercancel", onCancel);
-    window.addEventListener("blur", onBlur);
-    window.addEventListener("keydown", onKey);
-  };
-
-  // 拖动期间：靠近列表上下缘持续滚动；内容从指针下滚过时同步刷新指示线。
-  useEffect(() => {
-    if (!dragId) return;
-    let raf = 0;
-    const tick = () => {
-      const root = scrollRef.current;
-      const pt = dragPt.current;
-      if (root && pt) {
-        const r = root.getBoundingClientRect();
-        let v = 0;
-        if (pt.y < r.top + 28) v = -10;
-        else if (pt.y > r.bottom - 28) v = 10;
-        if (v) {
-          root.scrollBy({ top: v });
-          if (dragIdRef.current) updateDropFromPoint(dragIdRef.current, pt.x, pt.y);
-        }
-      }
-      raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [dragId, updateDropFromPoint]);
 
   const revealLabel = (() => {
     const p = platform();
@@ -404,157 +422,186 @@ export function TabBar() {
           />
         </div>
       ) : null}
-      <div className="tabs-scroll" ref={scrollRef} role="tablist" aria-orientation="vertical">
-        {visibleTabs.length === 0 && filterNorm ? (
-          <div className="tabs-filter-empty muted">{t("tab.filterEmpty")}</div>
-        ) : null}
-        {visibleTabs.map((tab) => {
-          const active = tab.id === activeTabId;
-          const title = tabLabel(tab);
-          const editing = editingId === tab.id;
-          return (
-            <div
-              key={tab.id}
-              data-tab-id={tab.id}
-              role="tab"
-              className={
-                "tab" +
-                (active ? " active" : "") +
-                (editing ? " editing" : "") +
-                (tab.dirty ? " dirty" : "") +
-                (tab.readOnly ? " readonly" : "") +
-                (tab.filePath && pinnedSet.has(tab.filePath) ? " pinned" : "") +
-                (dragId === tab.id ? " dragging" : "") +
-                (drop?.overId === tab.id
-                  ? drop.place === "before"
-                    ? " drop-before"
-                    : " drop-after"
-                  : "")
-              }
-              onPointerDown={(e) => {
-                if (e.button !== 0 || editing || filterNorm) return;
-                if (dragIdRef.current) return;
-                if ((e.target as HTMLElement).closest(".tab-close, .tab-title-input")) return;
-                beginPressTracking(tab.id, e.currentTarget, e.pointerId, e.clientX, e.clientY);
-              }}
-              onClick={() => {
-                if (editing) return;
-                if (suppressClick.current) {
-                  suppressClick.current = false;
-                  return;
-                }
-                setActiveTab(tab.id);
-                if (!tab.filePath) {
-                  lastClick.current = null;
-                  return;
-                }
-                const now = Date.now();
-                const prev = lastClick.current;
-                if (prev && prev.id === tab.id && now - prev.at < 450) {
-                  lastClick.current = null;
-                  startRename(tab.id, tab.filePath);
-                } else {
-                  lastClick.current = { id: tab.id, at: now };
-                }
-              }}
-              onDoubleClick={(e) => {
-                if (!tab.filePath || editing) return;
-                e.preventDefault();
-                e.stopPropagation();
-                lastClick.current = null;
-                setActiveTab(tab.id);
-                startRename(tab.id, tab.filePath);
-              }}
-              onContextMenu={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                if (editing) return;
-                setActiveTab(tab.id);
-                setCtx({
-                  tabId: tab.id,
-                  x: Math.min(e.clientX, window.innerWidth - 220),
-                  y: Math.min(e.clientY, window.innerHeight - 260),
-                });
-              }}
-              onAuxClick={(e) => {
-                if (e.button === 1) requestClose(tab.id);
-              }}
-              title={
-                tab.dirty
-                  ? `${tab.filePath ?? title} — ${t("tab.unsaved")}`
-                  : (tab.filePath ?? title)
-              }
-              aria-current={active ? "page" : undefined}
-              aria-selected={active}
-            >
-              {editing ? (
-                <input
-                  ref={inputRef}
-                  className="tab-title-input"
-                  value={draft}
-                  onChange={(e) => setDraft(e.target.value)}
-                  onClick={(e) => e.stopPropagation()}
-                  onMouseDown={(e) => e.stopPropagation()}
-                  onDoubleClick={(e) => e.stopPropagation()}
-                  onBlur={() => void commitRename()}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      armedAt.current = 0;
-                      e.currentTarget.blur();
-                    } else if (e.key === "Escape") {
-                      e.preventDefault();
-                      cancelRename();
+      <DndContext
+        sensors={sensors}
+        collisionDetection={tabCollisionDetection}
+        onDragStart={onDragStart}
+        onDragOver={onDragOver}
+        onDragEnd={onDragEnd}
+        onDragCancel={clearDragFeedback}
+      >
+        <div className="tabs-scroll" ref={scrollRef} role="tablist" aria-orientation="vertical">
+          {visibleTabs.length === 0 && filterNorm ? (
+            <div className="tabs-filter-empty muted">{t("tab.filterEmpty")}</div>
+          ) : null}
+          <SortableContext
+            items={visibleTabs.map((x) => x.id)}
+            strategy={verticalListSortingStrategy}
+          >
+            {visibleTabs.map((tab) => {
+              const active = tab.id === activeTabId;
+              const title = tabLabel(tab);
+              const editing = editingId === tab.id;
+              const overThis =
+                overId === tab.id && (!dragTab || isPinnedOf(dragTab) === isPinnedOf(tab));
+              return (
+                <SortableTab key={tab.id} id={tab.id} disabled={!!filterNorm || editing}>
+                  <div
+                    data-tab-id={tab.id}
+                    role="tab"
+                    className={
+                      "tab" +
+                      (active ? " active" : "") +
+                      (editing ? " editing" : "") +
+                      (tab.dirty ? " dirty" : "") +
+                      (tab.readOnly ? " readonly" : "") +
+                      (tab.filePath && pinnedSet.has(tab.filePath) ? " pinned" : "") +
+                      (dragId === tab.id ? " dragging" : "") +
+                      (overThis ? " drop-over" : "") +
+                      (overId === BLANK_ID && blankTargetId === tab.id ? " drop-after" : "")
                     }
-                  }}
-                  aria-label={t("tab.rename")}
-                />
-              ) : (
-                <>
-                  {tab.filePath && pinnedSet.has(tab.filePath) && (
-                    <span className="tab-pin" title={t("tab.pinned")} role="img" aria-label={t("tab.pinned")}>
-                      <Icon name="pin" size={12} />
+                    onClick={() => {
+                      if (editing) return;
+                      if (Date.now() - draggedAt.current < 150) return;
+                      setActiveTab(tab.id);
+                      if (!tab.filePath) {
+                        lastClick.current = null;
+                        return;
+                      }
+                      const now = Date.now();
+                      const prev = lastClick.current;
+                      if (prev && prev.id === tab.id && now - prev.at < 450) {
+                        lastClick.current = null;
+                        startRename(tab.id, tab.filePath);
+                      } else {
+                        lastClick.current = { id: tab.id, at: now };
+                      }
+                    }}
+                    onDoubleClick={(e) => {
+                      if (!tab.filePath || editing) return;
+                      e.preventDefault();
+                      e.stopPropagation();
+                      lastClick.current = null;
+                      setActiveTab(tab.id);
+                      startRename(tab.id, tab.filePath);
+                    }}
+                    onContextMenu={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      if (editing) return;
+                      setActiveTab(tab.id);
+                      setCtx({
+                        tabId: tab.id,
+                        x: Math.min(e.clientX, window.innerWidth - 220),
+                        y: Math.min(e.clientY, window.innerHeight - 260),
+                      });
+                    }}
+                    onAuxClick={(e) => {
+                      if (e.button === 1) requestClose(tab.id);
+                    }}
+                    title={
+                      tab.dirty
+                        ? `${tab.filePath ?? title} — ${t("tab.unsaved")}`
+                        : (tab.filePath ?? title)
+                    }
+                    aria-current={active ? "page" : undefined}
+                    aria-selected={active}
+                  >
+                    {editing ? (
+                      <input
+                        ref={inputRef}
+                        className="tab-title-input"
+                        value={draft}
+                        onChange={(e) => setDraft(e.target.value)}
+                        onClick={(e) => e.stopPropagation()}
+                        onMouseDown={(e) => e.stopPropagation()}
+                        onDoubleClick={(e) => e.stopPropagation()}
+                        onBlur={() => void commitRename()}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            armedAt.current = 0;
+                            e.currentTarget.blur();
+                          } else if (e.key === "Escape") {
+                            e.preventDefault();
+                            cancelRename();
+                          }
+                        }}
+                        aria-label={t("tab.rename")}
+                      />
+                    ) : (
+                      <>
+                        {tab.filePath && pinnedSet.has(tab.filePath) && (
+                          <span className="tab-pin" title={t("tab.pinned")} role="img" aria-label={t("tab.pinned")}>
+                            <Icon name="pin" size={12} />
+                          </span>
+                        )}
+                        {tab.readOnly && (
+                          <span
+                            className="tab-lock"
+                            title={t("view.readOnly")}
+                            role="img"
+                            aria-label={t("view.readOnly")}
+                          >
+                            <Icon name="lock" size={13} />
+                          </span>
+                        )}
+                        <span className="tab-title">{title}</span>
+                      </>
+                    )}
+                    <span className="tab-trailing">
+                      {tab.dirty && (
+                        <span
+                          className="tab-dot"
+                          title={t("tab.unsaved")}
+                          aria-label={t("tab.unsaved")}
+                          role="img"
+                        />
+                      )}
+                      <button
+                        className="tab-close"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (editing) cancelRename();
+                          requestClose(tab.id);
+                        }}
+                        title={t("tab.close")}
+                        aria-label={t("tab.close")}
+                      >
+                        <Icon name="close" size={14} />
+                      </button>
                     </span>
-                  )}
-                  {tab.readOnly && (
-                    <span
-                      className="tab-lock"
-                      title={t("view.readOnly")}
-                      role="img"
-                      aria-label={t("view.readOnly")}
-                    >
-                      <Icon name="lock" size={13} />
-                    </span>
-                  )}
-                  <span className="tab-title">{title}</span>
-                </>
+                  </div>
+                </SortableTab>
+              );
+            })}
+          </SortableContext>
+          {/* 列表空白区：占满剩余高度的「追加到组末」落点 */}
+          <BlankDropZone />
+        </div>
+        <DragOverlay dropAnimation={null}>
+          {dragTab ? (
+            <div
+              className={"tab tab-ghost" + (dragTab.id === activeTabId ? " active" : "")}
+            >
+              {dragTab.filePath && pinnedSet.has(dragTab.filePath) && (
+                <span className="tab-pin">
+                  <Icon name="pin" size={12} />
+                </span>
               )}
+              {dragTab.readOnly && (
+                <span className="tab-lock">
+                  <Icon name="lock" size={13} />
+                </span>
+              )}
+              <span className="tab-title">{tabLabel(dragTab)}</span>
               <span className="tab-trailing">
-                {tab.dirty && (
-                  <span
-                    className="tab-dot"
-                    title={t("tab.unsaved")}
-                    aria-label={t("tab.unsaved")}
-                    role="img"
-                  />
-                )}
-                <button
-                  className="tab-close"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (editing) cancelRename();
-                    requestClose(tab.id);
-                  }}
-                  title={t("tab.close")}
-                  aria-label={t("tab.close")}
-                >
-                  <Icon name="close" size={14} />
-                </button>
+                {dragTab.dirty && <span className="tab-dot" />}
               </span>
             </div>
-          );
-        })}
-      </div>
+          ) : null}
+        </DragOverlay>
+      </DndContext>
 
       <button
         className="tab-new"

@@ -170,8 +170,10 @@ textarea {
   border: none;
   -webkit-app-region: no-drag;
   app-region: no-drag;
-  /* 悬停提示可拖拽；原生拖动开始后由 dropEffect 接管光标 */
+  /* 悬停提示可拖拽；拖动光标由 body.tab-dragging 接管 */
   cursor: grab;
+  /* PointerSensor 要求：禁用触控滚动手势干扰 */
+  touch-action: none;
   position: relative;
   transition: background var(--transition), color var(--transition);
 }
@@ -287,9 +289,12 @@ textarea {
   background: var(--bg-active);
   color: var(--text);
 }
-/* 拖动排序：源标签半透明；目标标签上/下缘显示落点线 */
+/* 拖动排序：源标签半透明；悬停目标显示高亮环，空白区落点在组末标签下缘画线 */
 .tab.dragging {
   opacity: 0.45;
+}
+.tab.drop-over {
+  box-shadow: inset 0 0 0 2px var(--accent);
 }
 /* 指针拖动期间：全局抓手光标 + 禁止选区 */
 body.tab-dragging,
@@ -298,33 +303,29 @@ body.tab-dragging * {
   user-select: none;
   -webkit-user-select: none;
 }
-/* 跟随指针的浮动幽灵（源标签克隆） */
+/* 跟随指针的浮动幽灵（DragOverlay 内容） */
 .tab-ghost {
-  position: fixed;
-  z-index: 1000;
-  margin: 0;
   pointer-events: none;
   background: var(--bg-selected);
   color: var(--text);
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.28);
   opacity: 0.92;
 }
-.tab.drop-before::before,
+/* 列表剩余空白：作为「追加到组末」的拖放落点 */
+.tabs-blank {
+  flex: 1 1 auto;
+  min-height: 0;
+}
 .tab.drop-after::after {
   content: "";
   position: absolute;
   left: 6px;
   right: 6px;
+  bottom: 0;
   height: 2px;
   border-radius: 1px;
   background: var(--accent);
   pointer-events: none;
-}
-.tab.drop-before::before {
-  top: 0;
-}
-.tab.drop-after::after {
-  bottom: 0;
 }
 .tab-new {
   display: flex;
